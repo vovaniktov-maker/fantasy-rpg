@@ -2,6 +2,9 @@ import { expect, test } from '@playwright/test';
 
 test('vertical slice can complete the contract and survive reload', async ({ page }) => {
   await page.goto('/?testMode=1');
+  await expect(page.getByRole('button', { name: 'Defeat encounter' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Pick up test loot' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Defeat boss' })).toHaveCount(0);
   await expect(page.getByText('Bandit Leader Contract')).toBeVisible();
   await page.getByRole('button', { name: 'Accept' }).click();
   await page.getByRole('button', { name: 'Enter forest' }).click();
