@@ -108,6 +108,13 @@ export class PlayerCombatController {
     return { accepted: true, skillId };
   }
 
+  syncEnergy(energy: number): void {
+    this.energyState = {
+      ...this.energyState,
+      current: Math.max(0, Math.min(this.energyState.max, energy)),
+    };
+  }
+
   getSnapshot(): PlayerCombatSnapshot {
     return {
       energy: this.energyState.current,
