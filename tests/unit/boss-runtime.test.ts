@@ -35,6 +35,16 @@ describe('BossRuntime', () => {
     expect(recovery.recovering).toBe(true);
   });
 
+  it('all boss phases retain authored max hp and armor', () => {
+    const boss = new BossRuntime({ combat: new CombatRuntime(() => 0.5) });
+    const authored = { maxHp: boss.snapshot.maxHp, armor: boss.snapshot.armor };
+
+    for (const ratio of [1, 0.59, 0.24]) {
+      boss.setHp(Math.floor(authored.maxHp * ratio));
+      expect({ maxHp: boss.snapshot.maxHp, armor: boss.snapshot.armor }).toEqual(authored);
+    }
+  });
+
   it('resolves victory only once', () => {
     const boss = new BossRuntime({ combat: new CombatRuntime(() => 0.5) });
     boss.setHp(0);
