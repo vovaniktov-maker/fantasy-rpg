@@ -55,3 +55,33 @@ describe('EnemyRuntime', () => {
     );
   });
 });
+
+
+  it('scales outgoing damage without changing AI timing', () => {
+    const combat = new CombatRuntime(() => 0.5);
+    const enemy = new EnemyRuntime({
+      id: 'enemy-scaled',
+      definition: melee,
+      hp: 100,
+      position: { x: 0, y: 0 },
+      combat,
+      damageMultiplier: 0.1,
+    });
+    const close = { playerVisible: true, distance: 40, attackReady: true, hpRatio: 1 };
+    let targetHp = 100;
+    const target = {
+      id: 'player',
+      getHp: () => targetHp,
+      getArmor: () => 0,
+      isInvulnerable: () => false,
+      applyDamage: (amount: number) => { targetHp -= amount; },
+    };
+
+    enemy.update(close, 1);
+    enemy.update(close, 300);
+    const active = enemy.update(close, 1);
+    expect(active.attackWindowId).toBeDefined();
+    combat.tryHit(active.attackWindowId!, target);
+
+    expect(targetHp).toBe(99);
+  });
