@@ -1,9 +1,14 @@
 import Phaser from 'phaser';
 
+interface ArtScene {
+  textures: Phaser.Textures.TextureManager;
+  add: Phaser.GameObjects.GameObjectFactory;
+}
+
 type Draw = (graphics: Phaser.GameObjects.Graphics) => void;
 
 function makeTexture(
-  scene: Phaser.Scene,
+  scene: ArtScene,
   key: string,
   width: number,
   height: number,
@@ -75,7 +80,7 @@ function drawHammer(g: Phaser.GameObjects.Graphics, x: number, y: number): void 
   g.fillRect(x + 7, y + 7, 5, 20);
 }
 
-function drawPlayer(scene: Phaser.Scene): void {
+function drawPlayer(scene: ArtScene): void {
   makeTexture(scene, 'rogue', 48, 48, (g) => {
     pixelBody(g, 0x26323d, 0x352b54, 0xd6b08b, 0x754fc4);
     g.fillStyle(0x151b22, 1);
@@ -88,7 +93,7 @@ function drawPlayer(scene: Phaser.Scene): void {
   });
 }
 
-function drawEnemies(scene: Phaser.Scene): void {
+function drawEnemies(scene: ArtScene): void {
   makeTexture(scene, 'enemy-bandit-guard', 48, 48, (g) => {
     pixelBody(g, 0x5d4032, 0x7f352d, 0xc99b78, 0x9e6743);
     drawSword(g, 35, 17);
@@ -161,7 +166,7 @@ function drawEnemies(scene: Phaser.Scene): void {
   });
 }
 
-function drawItems(scene: Phaser.Scene): void {
+function drawItems(scene: ArtScene): void {
   makeTexture(scene, 'item-weapon', 32, 32, (g) => drawDagger(g, 8, 6));
   makeTexture(scene, 'item-offhand', 32, 32, (g) => {
     drawDagger(g, 8, 7, true);
@@ -240,7 +245,7 @@ function drawItems(scene: Phaser.Scene): void {
   });
 }
 
-function drawEnvironment(scene: Phaser.Scene): void {
+function drawEnvironment(scene: ArtScene): void {
   makeTexture(scene, 'tile-grass', 64, 64, (g) => {
     g.fillStyle(0x1f3426, 1);
     g.fillRect(0, 0, 64, 64);
@@ -351,7 +356,7 @@ function drawEnvironment(scene: Phaser.Scene): void {
   });
 }
 
-function drawEffects(scene: Phaser.Scene): void {
+function drawEffects(scene: ArtScene): void {
   makeTexture(scene, 'fx-slash', 72, 72, (g) => {
     g.lineStyle(7, 0xeee6cf, 0.9);
     g.beginPath();
@@ -376,7 +381,7 @@ function drawEffects(scene: Phaser.Scene): void {
   });
 }
 
-export function createProceduralArt(scene: Phaser.Scene): void {
+export function createProceduralArt(scene: ArtScene): void {
   drawPlayer(scene);
   drawEnemies(scene);
   drawItems(scene);
