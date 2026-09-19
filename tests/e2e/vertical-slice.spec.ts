@@ -223,6 +223,7 @@ test('vertical slice completes through real runtime input and survives reload', 
   await waitForScreen(page, 'hideout');
 
   await clearRuntimeEnemies(page, 40);
+  await expect(page.getByTestId('runtime-hideout-cleared')).toHaveText('true');
   await useHealthPotionIfNeeded(page);
   await pressUntilScreen(page, 'KeyE', 'boss');
 
