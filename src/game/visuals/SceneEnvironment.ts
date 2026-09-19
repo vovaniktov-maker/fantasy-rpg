@@ -1,8 +1,6 @@
 import Phaser from 'phaser';
 
-interface EnvironmentScene {
-  add: Phaser.GameObjects.GameObjectFactory;
-}
+type EnvironmentScene = any;
 
 function floor(scene: EnvironmentScene, key: string): void {
   scene.add.tileSprite(640, 360, 1280, 720, key).setDepth(-20);
