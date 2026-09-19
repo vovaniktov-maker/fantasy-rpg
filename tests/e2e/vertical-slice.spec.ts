@@ -151,8 +151,7 @@ test('vertical slice completes through real runtime input and survives reload', 
   await waitForScreen(page, 'hideout');
 
   await clearRuntimeEnemies(page, 40);
-  await page.keyboard.press('KeyE');
-  await waitForScreen(page, 'boss');
+  await pressUntilScreen(page, 'KeyE', 'boss');
 
   await moveTo(page, 650, 360, 45);
   await page.keyboard.press('Space');
