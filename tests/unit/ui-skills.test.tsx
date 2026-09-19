@@ -17,7 +17,7 @@ describe('SkillTreePanel active hotbar', () => {
     const off = gameBridge.onCommand(spy);
 
     render(<SkillTreePanel open />);
-    fireEvent.click(screen.getByRole('button', { name: /shadow_dash/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'shadow_dash' }));
     fireEvent.click(screen.getByRole('button', { name: 'Slot 1' }));
 
     expect(spy).toHaveBeenCalledWith({
