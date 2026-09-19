@@ -74,7 +74,7 @@ export class BossScene extends Phaser.Scene {
     });
     this.bossRuntime = new BossRuntime({
       combat: this.combat,
-      maxHp: Math.max(30, Math.round(600 * tuning.enemyHpMultiplier)),
+      maxHp: Math.max(1, Math.round(600 * tuning.enemyHpMultiplier)),
       timingMultiplier: tuning.timingMultiplier,
     });
 
