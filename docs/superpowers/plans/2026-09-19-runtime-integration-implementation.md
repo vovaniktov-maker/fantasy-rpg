@@ -1,14 +1,14 @@
 # Runtime Integration Pass Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (\`- [ ]\`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Wire the existing deterministic RPG domain systems into the real Phaser runtime so PR #1 becomes a genuinely playable Rogue combat/loot/boss vertical slice whose primary Playwright flow uses normal game inputs rather than direct session shortcuts.
 
-**Architecture:** Phaser scenes remain thin composition roots. New runtime adapters (\`DerivedStatsService\`, \`GameplayControlState\`, \`CombatRuntime\`, \`PlayerRuntime\`, \`EnemyRuntime\`, \`LootRuntime\`, \`BossRuntime\`) translate between Phaser objects/input and pure TypeScript domain rules. \`GameSession\` remains the persistent serializable state owner, but inventory/equipment/skill rules are delegated to canonical domain functions.
+**Architecture:** Phaser scenes remain thin composition roots. New runtime adapters (`DerivedStatsService`, `GameplayControlState`, `CombatRuntime`, `PlayerRuntime`, `EnemyRuntime`, `LootRuntime`, `BossRuntime`) translate between Phaser objects/input and pure TypeScript domain rules. `GameSession` remains the persistent serializable state owner, but inventory/equipment/skill rules are delegated to canonical domain functions.
 
 **Tech Stack:** TypeScript, Phaser 4.2.1, React 19, Vite 7, Vitest 3, Testing Library, Playwright, browser localStorage, GitHub Actions.
 
-**Spec:** \`docs/superpowers/specs/2026-09-19-runtime-integration-design.md\`
+**Spec:** `docs/superpowers/specs/2026-09-19-runtime-integration-design.md`
 
 ## Global Constraints
 
@@ -35,7 +35,7 @@
 
 ## Planned File Map
 
-\`\`\`text
+```text
 src/
   domain/
     inventory/inventory.ts
@@ -84,34 +84,35 @@ tests/
     pause-runtime.test.ts
   e2e/
     vertical-slice.spec.ts
-\`\`\`
+```
 
 ---
 
 ### Task 1: Canonical Inventory Mutation and Save Sanitation
 
 **Files:**
-- Modify: \`src/domain/inventory/inventory.ts\`
-- Modify: \`src/domain/save/saveSchema.ts\`
-- Modify: \`src/domain/state/GameState.ts\`
-- Modify: \`src/game/GameSession.ts\`
-- Test: \`tests/unit/save.test.ts\`
-- Test: \`tests/unit/items-inventory-equipment.test.ts\`
-- Test: \`tests/unit/session-flow.test.ts\`
+- Modify: `src/domain/inventory/inventory.ts`
+- Modify: `src/domain/save/saveSchema.ts`
+- Modify: `src/domain/save/saveRepository.ts`
+- Modify: `src/domain/state/GameState.ts`
+- Modify: `src/game/GameSession.ts`
+- Test: `tests/unit/save.test.ts`
+- Test: `tests/unit/items-inventory-equipment.test.ts`
+- Test: `tests/unit/session-flow.test.ts`
 
 **Interfaces:**
-- Consumes: current \`GameState\`, \`SerializableItemStack\`, item/skill content definitions.
+- Consumes: current `GameState`, `SerializableItemStack`, item/skill content definitions.
 - Produces:
-  - \`addSerializedItem(state: SerializableInventoryState, item: SerializableItemStack, definitions: ReadonlyMap<string, ItemDefinition>): SerializedAddResult\`
-  - \`sanitizeGameState(state: GameState, content: SaveContentIndex): GameState\`
-  - \`SaveContentIndex { itemIds, skillNodes, equipmentByInstance }\`
+  - `addSerializedItem(state: SerializableInventoryState, item: SerializableItemStack, definitions: ReadonlyMap<string, ItemDefinition>): SerializedAddResult`
+  - `sanitizeGameState(state: GameState, content: SaveContentIndex): GameState`
+  - `SaveContentIndex { itemIds, skillNodes, equipmentByInstance }`
 - Later tasks rely on one canonical serialized inventory insertion function and sanitized state.
 
 - [ ] **Step 1: Add failing serialized-inventory tests**
 
-Add to \`tests/unit/items-inventory-equipment.test.ts\`:
+Add to `tests/unit/items-inventory-equipment.test.ts`:
 
-\`\`\`ts
+```ts
 import { addSerializedItem } from '../../src/domain/inventory/inventory';
 import { buildContentRegistry } from '../../src/domain/content/contentRegistry';
 
@@ -139,25 +140,25 @@ it('fills an existing serialized stack when the entire pickup fits', () => {
   expect(result.added).toBe(true);
   expect(result.state.slots[0]?.quantity).toBe(10);
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Run the inventory tests and verify RED**
 
 Run:
 
-\`\`\`bash
+```bash
 npm test -- items-inventory-equipment.test.ts
-\`\`\`
+```
 
-Expected: FAIL because \`addSerializedItem\` is not exported from the domain inventory module.
+Expected: FAIL because `addSerializedItem` is not exported from the domain inventory module.
 
 - [ ] **Step 3: Implement atomic serialized insertion in the domain**
 
-In \`src/domain/inventory/inventory.ts\`, add serializable inventory types and implement insertion transactionally: clone, attempt all transfers, and return the original state when the whole item cannot fit.
+In `src/domain/inventory/inventory.ts`, add serializable inventory types and implement insertion transactionally: clone, attempt all transfers, and return the original state when the whole item cannot fit.
 
 Core signature:
 
-\`\`\`ts
+```ts
 export interface SerializableInventoryState {
   capacity: number;
   slots: Array<SerializableItemStack | null>;
@@ -174,15 +175,15 @@ export function addSerializedItem(
   item: SerializableItemStack,
   definitions: ReadonlyMap<string, ItemDefinition>,
 ): SerializedAddResult;
-\`\`\`
+```
 
-Use the item definition's \`stackable\` and \`maxStack\`; do not duplicate those rules in \`GameSession\`.
+Use the item definition's `stackable` and `maxStack`; do not duplicate those rules in `GameSession`.
 
 - [ ] **Step 4: Add failing save-sanitation tests**
 
-Add to \`tests/unit/save.test.ts\`:
+Add to `tests/unit/save.test.ts`:
 
-\`\`\`ts
+```ts
 it('removes unknown skills, invalid active slots, and stale equipment references', () => {
   const content = buildContentRegistry();
   const state = createInitialGameState();
@@ -209,84 +210,84 @@ it('removes unknown skills, invalid active slots, and stale equipment references
   expect(restored.skills.equippedActiveSkillIds[1]).toBe('shadow_dash');
   expect(restored.equipment.weapon).toBeNull();
 });
-\`\`\`
+```
 
 - [ ] **Step 5: Run save tests and verify RED**
 
 Run:
 
-\`\`\`bash
+```bash
 npm test -- save.test.ts
-\`\`\`
+```
 
-Expected: FAIL because deserialize currently accepts only \`knownItemIds\` and leaves stale skill/equipment references intact.
+Expected: FAIL because deserialize currently accepts only `knownItemIds` and leaves stale skill/equipment references intact.
 
-- [ ] **Step 6: Implement \`SaveContentIndex\` sanitation**
+- [ ] **Step 6: Implement `SaveContentIndex` sanitation**
 
-In \`saveSchema.ts\` define:
+In `saveSchema.ts` define:
 
-\`\`\`ts
+```ts
 export interface SaveContentIndex {
   itemIds: ReadonlySet<string>;
   skillNodes: ReadonlyMap<string, SkillNodeDefinition>;
 }
-\`\`\`
+```
 
 Sanitation rules:
 - remove unknown inventory item definitions;
 - remove unknown learned skill IDs;
-- clamp known skill ranks to \`[0, maxRank]\`;
+- clamp known skill ranks to `[0, maxRank]`;
 - derive the set of learned active IDs from learned active nodes;
 - clear active slots not present in that learned-active set;
 - clear equipment instance IDs not present in sanitized inventory or whose item's defined slot does not match the equipment key.
 
-Update \`LocalSaveRepository\` constructor to receive \`SaveContentIndex\`.
+Update `LocalSaveRepository` constructor to receive `SaveContentIndex`.
 
 - [ ] **Step 7: Replace GameSession's private insertion helper**
 
-Delete the private \`addSerializedItem\` in \`GameSession.ts\`. Import the domain function and use it in \`grantLoot\`, \`turnIn\`, and \`buy\`. Every failed full-item insertion must leave state/gold/quest reward state unchanged.
+Delete the private `addSerializedItem` in `GameSession.ts`. Import the domain function and use it in `grantLoot`, `turnIn`, and `buy`. Every failed full-item insertion must leave state/gold/quest reward state unchanged.
 
 - [ ] **Step 8: Verify Task 1**
 
 Run:
 
-\`\`\`bash
+```bash
 npm test -- items-inventory-equipment.test.ts save.test.ts session-flow.test.ts
 npm test
-\`\`\`
+```
 
 Expected: all PASS.
 
 - [ ] **Step 9: Commit**
 
-\`\`\`bash
+```bash
 git add src/domain/inventory/inventory.ts src/domain/save/saveSchema.ts src/domain/save/saveRepository.ts src/domain/state/GameState.ts src/game/GameSession.ts tests/unit/items-inventory-equipment.test.ts tests/unit/save.test.ts tests/unit/session-flow.test.ts
 git commit -m "fix: unify inventory rules and sanitize saves"
-\`\`\`
+```
 
 ---
 
 ### Task 2: Derived Combat Stats, Equipment Resolution, and Active Skill Assignment
 
 **Files:**
-- Create: \`src/domain/stats/DerivedStatsService.ts\`
-- Modify: \`src/domain/skills/skillTree.ts\`
-- Modify: \`src/game/bridge/gameMessages.ts\`
-- Modify: \`src/game/GameSession.ts\`
-- Test: \`tests/unit/derived-stats.test.ts\`
-- Test: \`tests/unit/skill-assignment.test.ts\`
+- Create: `src/domain/stats/DerivedStatsService.ts`
+- Modify: `src/domain/skills/skillTree.ts`
+- Modify: `src/game/bridge/gameMessages.ts`
+- Modify: `src/game/GameSession.ts`
+- Test: `tests/unit/derived-stats.test.ts`
+- Test: `tests/unit/skill-assignment.test.ts`
 
 **Interfaces:**
-- Consumes: sanitized \`GameState\`, item registry, Rogue skill nodes.
+- Consumes: sanitized `GameState`, item registry, Rogue skill nodes.
 - Produces:
-  - \`deriveCombatStats(state, content): DerivedCombatStats\`
-  - \`resolveEquippedItems(state, content): Partial<Record<EquipmentSlot, ItemInstanceLike>>\`
-  - \`assignActiveSkill(definitions, skillState, slots, activeSkillId, slotIndex): ActiveSkillAssignmentResult\`
-  - new command \`ASSIGN_ACTIVE_SKILL\`.
+  - `deriveCombatStats(state, content): DerivedCombatStats`
+  - `resolveEquippedItems(state, content): Partial<Record<EquipmentSlot, ItemInstanceLike>>`
+  - `assignActiveSkill(definitions, skillState, slots, activeSkillId, slotIndex): ActiveSkillAssignmentResult`
+  - new command `ASSIGN_ACTIVE_SKILL`.
 
 - [ ] **Step 1: Write failing derived-stat tests**
 
-\`\`\`ts
+```ts
 it('combines equipped item and learned passive modifiers', () => {
   const state = createInitialGameState();
   state.inventory.slots[0] = {
@@ -309,23 +310,23 @@ it('ignores stale equipped instance ids', () => {
   state.equipment.weapon = 'missing';
   expect(() => deriveCombatStats(state, buildContentRegistry())).not.toThrow();
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Verify RED**
 
 Run:
 
-\`\`\`bash
+```bash
 npm test -- derived-stats.test.ts
-\`\`\`
+```
 
-Expected: FAIL because \`DerivedStatsService\` does not exist.
+Expected: FAIL because `DerivedStatsService` does not exist.
 
 - [ ] **Step 3: Implement the derived-stat service**
 
-Define a single base Rogue stat constant inside \`DerivedStatsService.ts\`:
+Define a single base Rogue stat constant inside `DerivedStatsService.ts`:
 
-\`\`\`ts
+```ts
 export const ROGUE_BASE_STATS: CoreStats = {
   hp: 100,
   energy: 100,
@@ -338,20 +339,20 @@ export const ROGUE_BASE_STATS: CoreStats = {
   cooldownReduction: 0,
   dodgeDistance: 120,
 };
-\`\`\`
+```
 
 Resolve equipment by instance ID against inventory entries and their item definitions. For current serialized items, rebuild base item modifiers from the definition plus affix IDs found in content. Apply learned passive/keystone modifiers once per learned rank. Return:
 
-\`\`\`ts
+```ts
 export interface DerivedCombatStats extends CoreStats {
   base: CoreStats;
   equippedInstanceIds: Partial<Record<EquipmentSlot, string>>;
 }
-\`\`\`
+```
 
 - [ ] **Step 4: Write failing active-skill assignment tests**
 
-\`\`\`ts
+```ts
 it('assigns only a learned active skill to slots 0 through 3', () => {
   const state = { learned: { assassin_shadow_dash: 1 } };
   const result = assignActiveSkill(rogueSkillNodes, state, [null, null, null, null], 'shadow_dash', 0);
@@ -365,21 +366,21 @@ it('rejects passive ids, unknown ids, duplicates, and invalid slot indexes', () 
   expect(assignActiveSkill(rogueSkillNodes, state, ['shadow_dash', null, null, null], 'shadow_dash', 1).assigned).toBe(false);
   expect(assignActiveSkill(rogueSkillNodes, state, [null, null, null, null], 'shadow_dash', 9).assigned).toBe(false);
 });
-\`\`\`
+```
 
 - [ ] **Step 5: Verify RED and implement assignment**
 
 Run:
 
-\`\`\`bash
+```bash
 npm test -- skill-assignment.test.ts
-\`\`\`
+```
 
-Expected: FAIL because \`assignActiveSkill\` does not exist.
+Expected: FAIL because `assignActiveSkill` does not exist.
 
 Implement:
 
-\`\`\`ts
+```ts
 export function assignActiveSkill(
   definitions: readonly SkillNodeDefinition[],
   state: SkillTreeState,
@@ -387,60 +388,60 @@ export function assignActiveSkill(
   activeSkillId: string,
   slotIndex: number,
 ): ActiveSkillAssignmentResult;
-\`\`\`
+```
 
-It must find an active node whose \`activeSkillId\` matches and whose node is learned.
+It must find an active node whose `activeSkillId` matches and whose node is learned.
 
 - [ ] **Step 6: Add bridge/session command**
 
-Extend \`GameCommand\`:
+Extend `GameCommand`:
 
-\`\`\`ts
+```ts
 | { type: 'ASSIGN_ACTIVE_SKILL'; activeSkillId: string; slotIndex: number }
-\`\`\`
+```
 
-Handle it in \`GameSession\` by calling the domain function and publishing only on success.
+Handle it in `GameSession` by calling the domain function and publishing only on success.
 
 - [ ] **Step 7: Verify Task 2**
 
-\`\`\`bash
+```bash
 npm test -- derived-stats.test.ts skill-assignment.test.ts progression-skills.test.ts session-flow.test.ts
 npm test
-\`\`\`
+```
 
 Expected: all PASS.
 
 - [ ] **Step 8: Commit**
 
-\`\`\`bash
+```bash
 git add src/domain/stats/DerivedStatsService.ts src/domain/skills/skillTree.ts src/game/bridge/gameMessages.ts src/game/GameSession.ts tests/unit/derived-stats.test.ts tests/unit/skill-assignment.test.ts
 git commit -m "feat: derive runtime stats and assign active skills"
-\`\`\`
+```
 
 ---
 
 ### Task 3: Shared Gameplay Control and Pause State
 
 **Files:**
-- Create: \`src/game/runtime/GameplayControlState.ts\`
-- Create: \`src/ui/useGameplayControls.ts\`
-- Modify: \`src/app/App.tsx\`
-- Modify: \`src/ui/menus/PauseMenu.tsx\`
-- Test: \`tests/unit/gameplay-control-state.test.ts\`
-- Test: \`tests/integration/pause-runtime.test.ts\`
+- Create: `src/game/runtime/GameplayControlState.ts`
+- Create: `src/ui/useGameplayControls.ts`
+- Modify: `src/app/App.tsx`
+- Modify: `src/ui/menus/PauseMenu.tsx`
+- Test: `tests/unit/gameplay-control-state.test.ts`
+- Test: `tests/integration/pause-runtime.test.ts`
 
 **Interfaces:**
 - Produces:
-  - \`gameplayControlState.setUiCapture(source, active)\`
-  - \`gameplayControlState.setPaused(paused)\`
-  - \`gameplayControlState.getSnapshot(): { inputEnabled: boolean; paused: boolean }\`
+  - `gameplayControlState.setUiCapture(source, active)`
+  - `gameplayControlState.setPaused(paused)`
+  - `gameplayControlState.getSnapshot(): { inputEnabled: boolean; paused: boolean }`
   - subscribe/unsubscribe API compatible with React and runtime code.
 - Consumes: React modal states.
 - Later Player/Enemy runtimes query the same control state.
 
 - [ ] **Step 1: Write failing control-state tests**
 
-\`\`\`ts
+```ts
 it('suppresses input while any UI owner captures controls', () => {
   const controls = new GameplayControlState();
   controls.setUiCapture('inventory', true);
@@ -457,27 +458,27 @@ it('pause disables input and marks simulation paused', () => {
   controls.setPaused(true);
   expect(controls.getSnapshot()).toEqual({ inputEnabled: false, paused: true });
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Verify RED**
 
-\`\`\`bash
+```bash
 npm test -- gameplay-control-state.test.ts
-\`\`\`
+```
 
 Expected: FAIL because the class does not exist.
 
 - [ ] **Step 3: Implement reference-counted UI capture**
 
-Use a \`Set<string>\` of capture sources and stable immutable snapshots. No DOM attribute is the source of truth.
+Use a `Set<string>` of capture sources and stable immutable snapshots. No DOM attribute is the source of truth.
 
 - [ ] **Step 4: Wire React modals**
 
-In \`App.tsx\`, update capture state with effects for inventory, skills, merchant, and pause. Pause must call \`setPaused(true/false)\`; inventory/skills/merchant capture input without globally pausing simulation.
+In `App.tsx`, update capture state with effects for inventory, skills, merchant, and pause. Pause must call `setPaused(true/false)`; inventory/skills/merchant capture input without globally pausing simulation.
 
 - [ ] **Step 5: Add integration test for runtime input gate**
 
-\`\`\`ts
+```ts
 it('prevents a runtime input callback while paused', () => {
   const controls = new GameplayControlState();
   controls.setPaused(true);
@@ -485,39 +486,39 @@ it('prevents a runtime input callback while paused', () => {
   controls.setPaused(false);
   expect(canProcessGameplayInput(controls.getSnapshot())).toBe(true);
 });
-\`\`\`
+```
 
-Expose the tiny pure helper from \`GameplayControlState.ts\`.
+Expose the tiny pure helper from `GameplayControlState.ts`.
 
 - [ ] **Step 6: Verify and commit**
 
-\`\`\`bash
+```bash
 npm test -- gameplay-control-state.test.ts pause-runtime.test.ts
 npm test
 git add src/game/runtime/GameplayControlState.ts src/ui/useGameplayControls.ts src/app/App.tsx src/ui/menus/PauseMenu.tsx tests/unit/gameplay-control-state.test.ts tests/integration/pause-runtime.test.ts
 git commit -m "feat: synchronize UI capture with gameplay pause state"
-\`\`\`
+```
 
 ---
 
 ### Task 4: CombatRuntime with One-Hit Attack Windows
 
 **Files:**
-- Create: \`src/game/runtime/runtimeTypes.ts\`
-- Create: \`src/game/runtime/CombatRuntime.ts\`
-- Test: \`tests/unit/combat-runtime.test.ts\`
+- Create: `src/game/runtime/runtimeTypes.ts`
+- Create: `src/game/runtime/CombatRuntime.ts`
+- Test: `tests/unit/combat-runtime.test.ts`
 
 **Interfaces:**
-- Consumes: \`resolveDamage\`, \`HitboxSystem\`, injected RNG.
+- Consumes: `resolveDamage`, `HitboxSystem`, injected RNG.
 - Produces:
-  - \`CombatRuntime.beginAttack(window: AttackWindowDefinition): string\`
-  - \`CombatRuntime.tryHit(attackId, target): CombatHitResult\`
-  - \`CombatRuntime.endAttack(attackId): void\`
-  - \`RuntimeCombatTarget\` contract.
+  - `CombatRuntime.beginAttack(window: AttackWindowDefinition): string`
+  - `CombatRuntime.tryHit(attackId, target): CombatHitResult`
+  - `CombatRuntime.endAttack(attackId): void`
+  - `RuntimeCombatTarget` contract.
 
 - [ ] **Step 1: Write the failing one-hit test**
 
-\`\`\`ts
+```ts
 it('damages a target only once per active attack window', () => {
   const combat = new CombatRuntime(() => 0.5);
   const target = makeTarget('enemy-1', 100, 0);
@@ -532,11 +533,11 @@ it('damages a target only once per active attack window', () => {
   expect(combat.tryHit(attackId, target).applied).toBe(false);
   expect(target.hp).toBe(80);
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Add i-frame test**
 
-\`\`\`ts
+```ts
 it('does not damage an invulnerable target', () => {
   const combat = new CombatRuntime(() => 0);
   const target = makeTarget('player', 100, 0, true);
@@ -544,21 +545,21 @@ it('does not damage an invulnerable target', () => {
   expect(combat.tryHit(id, target).applied).toBe(false);
   expect(target.hp).toBe(100);
 });
-\`\`\`
+```
 
 - [ ] **Step 3: Verify RED**
 
-\`\`\`bash
+```bash
 npm test -- combat-runtime.test.ts
-\`\`\`
+```
 
-Expected: FAIL because \`CombatRuntime\` does not exist.
+Expected: FAIL because `CombatRuntime` does not exist.
 
 - [ ] **Step 4: Implement minimal runtime**
 
 Define:
 
-\`\`\`ts
+```ts
 export interface RuntimeCombatTarget {
   id: string;
   getHp(): number;
@@ -573,45 +574,45 @@ export interface AttackWindowDefinition {
   critChance: number;
   critDamage: number;
 }
-\`\`\`
+```
 
-Internally store \`Map<attackId, { definition, hitTargetIds: Set<string> }>\`. Add the target ID only after a successful non-invulnerable hit.
+Internally store `Map<attackId, { definition, hitTargetIds: Set<string> }>`. Add the target ID only after a successful non-invulnerable hit.
 
 - [ ] **Step 5: Emit feedback events without owning visuals**
 
-Return \`critical\` and \`finalDamage\` from \`tryHit\`; scenes/runtimes translate that result into \`CombatFeedback\` commands.
+Return `critical` and `finalDamage` from `tryHit`; scenes/runtimes translate that result into `CombatFeedback` commands.
 
 - [ ] **Step 6: Verify and commit**
 
-\`\`\`bash
+```bash
 npm test -- combat-runtime.test.ts combat.test.ts combat-feedback.test.ts
 npm test
 git add src/game/runtime/runtimeTypes.ts src/game/runtime/CombatRuntime.ts tests/unit/combat-runtime.test.ts
 git commit -m "feat: add deterministic runtime combat windows"
-\`\`\`
+```
 
 ---
 
 ### Task 5: PlayerRuntime — Real Movement, Combo, Dodge, Energy, and Skill Input
 
 **Files:**
-- Create: \`src/game/runtime/PlayerRuntime.ts\`
-- Modify: \`src/game/player/PlayerCombatController.ts\`
-- Modify: \`src/game/input/InputBindings.ts\`
-- Test: \`tests/unit/player-runtime.test.ts\`
-- Modify/Test: \`tests/integration/player-runtime.test.ts\`
+- Create: `src/game/runtime/PlayerRuntime.ts`
+- Modify: `src/game/player/PlayerCombatController.ts`
+- Modify: `src/game/input/InputBindings.ts`
+- Test: `tests/unit/player-runtime.test.ts`
+- Modify/Test: `tests/integration/player-runtime.test.ts`
 
 **Interfaces:**
-- Consumes: \`PlayerController\`, \`PlayerCombatController\`, \`CombatRuntime\`, \`GameplayControlState\`, \`DerivedCombatStats\`.
+- Consumes: `PlayerController`, `PlayerCombatController`, `CombatRuntime`, `GameplayControlState`, `DerivedCombatStats`.
 - Produces:
-  - \`PlayerRuntime.update(input, dtMs): PlayerRuntimeFrame\`
-  - \`PlayerRuntime.getCombatTarget(): RuntimeCombatTarget\`
-  - \`PlayerRuntime.applyDerivedStats(stats): void\`
+  - `PlayerRuntime.update(input, dtMs): PlayerRuntimeFrame`
+  - `PlayerRuntime.getCombatTarget(): RuntimeCombatTarget`
+  - `PlayerRuntime.applyDerivedStats(stats): void`
   - attack/skill events that scenes can render.
 
 - [ ] **Step 1: Write failing input-gate and dodge tests**
 
-\`\`\`ts
+```ts
 it('ignores movement and attack while gameplay input is disabled', () => {
   const runtime = makePlayerRuntime();
   runtime.setControls({ inputEnabled: false, paused: false });
@@ -628,21 +629,21 @@ it('spends energy once and moves along the dodge direction', () => {
   expect(second.dodgeStarted).toBe(false);
   expect(runtime.snapshot.energy).toBe(70);
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Verify RED**
 
-\`\`\`bash
+```bash
 npm test -- player-runtime.test.ts
-\`\`\`
+```
 
-Expected: FAIL because \`PlayerRuntime\` does not exist.
+Expected: FAIL because `PlayerRuntime` does not exist.
 
 - [ ] **Step 3: Extend PlayerCombatController with explicit attack windows**
 
 Add a minimal attack state:
 
-\`\`\`ts
+```ts
 export interface BasicAttackRequest {
   accepted: boolean;
   comboStep: number;
@@ -650,31 +651,31 @@ export interface BasicAttackRequest {
   recoveryMs: number;
   damageMultiplier: number;
 }
-\`\`\`
+```
 
-Use combo steps 1/2/3 with configurable multipliers \`1.0 / 1.0 / 1.35\`. Attack speed scales timing, not damage.
+Use combo steps 1/2/3 with configurable multipliers `1.0 / 1.0 / 1.35`. Attack speed scales timing, not damage.
 
 - [ ] **Step 4: Implement PlayerRuntime**
 
 The runtime:
 - zeroes movement/action requests when input is disabled;
 - updates facing every enabled frame;
-- asks \`PlayerCombatController\` for dodge/combo/skills;
-- translates accepted attacks into \`CombatRuntime.beginAttack()\`;
+- asks `PlayerCombatController` for dodge/combo/skills;
+- translates accepted attacks into `CombatRuntime.beginAttack()`;
 - exposes active attack IDs and directional geometry for the Phaser adapter;
 - syncs live HP/energy changes through callbacks supplied by scene/session integration;
-- reads assigned skills from \`GameState.skills.equippedActiveSkillIds\`.
+- reads assigned skills from `GameState.skills.equippedActiveSkillIds`.
 
 - [ ] **Step 5: Implement active skill runtime definitions for the slice**
 
-Create a small table inside \`PlayerRuntime.ts\` or \`runtimeTypes.ts\` for current active IDs:
-- \`shadow_dash\`: dash + attack window, energy 35;
-- \`blade_fan\`: short ranged fan, energy 30;
-- \`riposte\`: brief defensive/counter window, energy 25;
-- \`flurry\`: multi-hit attack sequence, energy 40;
-- \`poison_strike\`: melee hit with poison hook, energy 25;
-- \`venom_trap\`: placed area hook, energy 35;
-- \`smoke_bomb\`: utility hook, energy 30.
+Create a small table inside `PlayerRuntime.ts` or `runtimeTypes.ts` for current active IDs:
+- `shadow_dash`: dash + attack window, energy 35;
+- `blade_fan`: short ranged fan, energy 30;
+- `riposte`: brief defensive/counter window, energy 25;
+- `flurry`: multi-hit attack sequence, energy 40;
+- `poison_strike`: melee hit with poison hook, energy 25;
+- `venom_trap`: placed area hook, energy 35;
+- `smoke_bomb`: utility hook, energy 30.
 
 For this pass, visual sophistication may remain placeholder-level; the runtime action, cost, cooldown, and damage/status hook must be real.
 
@@ -682,43 +683,43 @@ For this pass, visual sophistication may remain placeholder-level; the runtime a
 
 Run:
 
-\`\`\`bash
+```bash
 npm test -- player-runtime.test.ts tests/integration/player-runtime.test.ts energy-combo-dodge.test.ts
 npm test
-\`\`\`
+```
 
 Expected: all PASS.
 
 - [ ] **Step 7: Commit**
 
-\`\`\`bash
+```bash
 git add src/game/runtime/PlayerRuntime.ts src/game/player/PlayerCombatController.ts src/game/input/InputBindings.ts tests/unit/player-runtime.test.ts tests/integration/player-runtime.test.ts
 git commit -m "feat: wire rogue controls into player runtime"
-\`\`\`
+```
 
 ---
 
 ### Task 6: EnemyRuntime — AI, Telegraphs, Movement, and Damage
 
 **Files:**
-- Create: \`src/game/runtime/EnemyRuntime.ts\`
-- Modify: \`src/game/enemies/EnemyActor.ts\`
-- Modify: \`src/game/enemies/EnemyController.ts\`
-- Test: \`tests/unit/enemy-runtime.test.ts\`
-- Modify/Test: \`tests/unit/enemy-brain.test.ts\`
-- Test: \`tests/integration/runtime-combat-loop.test.ts\`
+- Create: `src/game/runtime/EnemyRuntime.ts`
+- Modify: `src/game/enemies/EnemyActor.ts`
+- Modify: `src/game/enemies/EnemyController.ts`
+- Test: `tests/unit/enemy-runtime.test.ts`
+- Modify/Test: `tests/unit/enemy-brain.test.ts`
+- Test: `tests/integration/runtime-combat-loop.test.ts`
 
 **Interfaces:**
-- Consumes: \`EnemyDefinition\`, \`EnemyController\`, \`EnemyActor\`, \`CombatRuntime\`.
+- Consumes: `EnemyDefinition`, `EnemyController`, `EnemyActor`, `CombatRuntime`.
 - Produces:
-  - \`EnemyRuntime.update(observation, dtMs): EnemyRuntimeFrame\`
-  - \`EnemyRuntime.getCombatTarget()\`
-  - \`EnemyRuntime.isDead()\`
-  - \`EnemyRuntime.consumeDeathEvent()\`.
+  - `EnemyRuntime.update(observation, dtMs): EnemyRuntimeFrame`
+  - `EnemyRuntime.getCombatTarget()`
+  - `EnemyRuntime.isDead()`
+  - `EnemyRuntime.consumeDeathEvent()`.
 
 - [ ] **Step 1: Write telegraph → attack → recovery runtime test**
 
-\`\`\`ts
+```ts
 it('does not create a damaging window before telegraph completes', () => {
   const enemy = makeEnemyRuntime('bandit_melee');
   const close = { playerVisible: true, distance: 40, attackReady: true, hpRatio: 1 };
@@ -735,27 +736,27 @@ it('does not create a damaging window before telegraph completes', () => {
   const recovery = enemy.update(close, 1);
   expect(recovery.recovering).toBe(true);
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Verify RED**
 
-\`\`\`bash
+```bash
 npm test -- enemy-runtime.test.ts
-\`\`\`
+```
 
-Expected: FAIL because \`EnemyRuntime\` does not exist.
+Expected: FAIL because `EnemyRuntime` does not exist.
 
 - [ ] **Step 3: Implement intent execution**
 
 Map intents:
-- \`moveToward\` -> velocity toward player;
-- \`moveAway\` -> velocity away;
-- \`strafe\` -> perpendicular velocity with deterministic sign;
-- \`prepareAttack\` -> telegraph frame, no damage;
-- \`attack\` -> create/maintain one combat window for selected attack;
-- \`recover\` -> no damage window and no immediate new attack.
+- `moveToward` -> velocity toward player;
+- `moveAway` -> velocity away;
+- `strafe` -> perpendicular velocity with deterministic sign;
+- `prepareAttack` -> telegraph frame, no damage;
+- `attack` -> create/maintain one combat window for selected attack;
+- `recover` -> no damage window and no immediate new attack.
 
-Use \`definition.moveSpeed\` and existing attack damage/range values.
+Use `definition.moveSpeed` and existing attack damage/range values.
 
 - [ ] **Step 4: Add distinct-archtype assertions**
 
@@ -763,7 +764,7 @@ Test that archer preferred range exceeds melee, heavy speed is lower, cutthroat 
 
 - [ ] **Step 5: Add player-vs-enemy integration test**
 
-In \`runtime-combat-loop.test.ts\`, construct a PlayerRuntime + EnemyRuntime + shared CombatRuntime and prove:
+In `runtime-combat-loop.test.ts`, construct a PlayerRuntime + EnemyRuntime + shared CombatRuntime and prove:
 - player attack reduces enemy HP;
 - duplicate overlap callback does not double damage;
 - enemy telegraph does not damage;
@@ -772,34 +773,34 @@ In \`runtime-combat-loop.test.ts\`, construct a PlayerRuntime + EnemyRuntime + s
 
 - [ ] **Step 6: Verify and commit**
 
-\`\`\`bash
+```bash
 npm test -- enemy-runtime.test.ts enemy-brain.test.ts tests/integration/runtime-combat-loop.test.ts
 npm test
 git add src/game/runtime/EnemyRuntime.ts src/game/enemies/EnemyActor.ts src/game/enemies/EnemyController.ts tests/unit/enemy-runtime.test.ts tests/unit/enemy-brain.test.ts tests/integration/runtime-combat-loop.test.ts
 git commit -m "feat: execute enemy AI in live combat runtime"
-\`\`\`
+```
 
 ---
 
 ### Task 7: LootRuntime and Enemy Death Drops
 
 **Files:**
-- Create: \`src/game/runtime/LootRuntime.ts\`
-- Modify: \`src/game/world/WorldPickup.ts\`
-- Modify: \`src/game/GameSession.ts\`
-- Test: \`tests/unit/loot-runtime.test.ts\`
-- Modify/Test: \`tests/unit/items-inventory-equipment.test.ts\`
+- Create: `src/game/runtime/LootRuntime.ts`
+- Modify: `src/game/world/WorldPickup.ts`
+- Modify: `src/game/GameSession.ts`
+- Test: `tests/unit/loot-runtime.test.ts`
+- Modify/Test: `tests/unit/items-inventory-equipment.test.ts`
 
 **Interfaces:**
 - Consumes: loot tables, deterministic RNG, canonical serialized inventory insertion.
 - Produces:
-  - \`LootRuntime.spawnDrop(drop): RuntimeWorldPickup\`
-  - \`LootRuntime.tryInteract(playerPosition): LootInteractionResult\`
+  - `LootRuntime.spawnDrop(drop): RuntimeWorldPickup`
+  - `LootRuntime.tryInteract(playerPosition): LootInteractionResult`
   - pickup remains until complete transfer.
 
 - [ ] **Step 1: Write full-inventory runtime test**
 
-\`\`\`ts
+```ts
 it('keeps the pickup alive when inventory cannot accept it', () => {
   const runtime = makeLootRuntime({ capacity: 1, filled: true });
   const pickup = runtime.spawnDrop(makeSteelDaggerDrop({ x: 10, y: 10 }));
@@ -808,73 +809,73 @@ it('keeps the pickup alive when inventory cannot accept it', () => {
   expect(pickup.collected).toBe(false);
   expect(runtime.activePickups()).toHaveLength(1);
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Write range/manual-interact test**
 
-\`\`\`ts
+```ts
 it('does not collect without interaction range', () => {
   const runtime = makeLootRuntime({ capacity: 20, filled: false });
   runtime.spawnDrop(makeSteelDaggerDrop({ x: 500, y: 500 }));
   expect(runtime.tryInteract({ x: 0, y: 0 }).collected).toBe(false);
 });
-\`\`\`
+```
 
 - [ ] **Step 3: Verify RED and implement**
 
 Run:
 
-\`\`\`bash
+```bash
 npm test -- loot-runtime.test.ts
-\`\`\`
+```
 
-Expected: FAIL because \`LootRuntime\` does not exist.
+Expected: FAIL because `LootRuntime` does not exist.
 
-Implement an injected \`getInventory/setInventory\` boundary and an interaction radius. \`WorldPickup.tryCollect()\` must call the canonical insertion path or receive a canonical insertion callback; it must not maintain a second rule set.
+Implement an injected `getInventory/setInventory` boundary and an interaction radius. `WorldPickup.tryCollect()` must call the canonical insertion path or receive a canonical insertion callback; it must not maintain a second rule set.
 
 - [ ] **Step 4: Connect enemy death to loot-table selection**
 
 Add a pure helper:
 
-\`\`\`ts
+```ts
 export function createEnemyDrop(
   enemyDefinitionId: string,
   level: number,
   rng: RandomSource,
   content: ContentRegistry,
 ): SerializableItemStack | null;
-\`\`\`
+```
 
-Map enemy IDs to existing loot tables. Generate stable runtime instance IDs from injected ID source, never \`Math.random()\`.
+Map enemy IDs to existing loot tables. Generate stable runtime instance IDs from injected ID source, never `Math.random()`.
 
 - [ ] **Step 5: Verify and commit**
 
-\`\`\`bash
+```bash
 npm test -- loot-runtime.test.ts items-inventory-equipment.test.ts
 npm test
 git add src/game/runtime/LootRuntime.ts src/game/world/WorldPickup.ts src/game/GameSession.ts tests/unit/loot-runtime.test.ts tests/unit/items-inventory-equipment.test.ts
 git commit -m "feat: drop and collect world loot through runtime"
-\`\`\`
+```
 
 ---
 
 ### Task 8: Integrate Real Runtime into Forest and Hideout Scenes
 
 **Files:**
-- Modify: \`src/game/scenes/ForestScene.ts\`
-- Modify: \`src/game/scenes/HideoutScene.ts\`
-- Modify: \`src/game/world/DungeonAssembler.ts\`
-- Create: \`src/game/runtime/SceneRuntimeHost.ts\`
-- Test: \`tests/integration/dungeon-runtime.test.ts\`
-- Test: \`tests/integration/scene-runtime-lifecycle.test.ts\`
+- Modify: `src/game/scenes/ForestScene.ts`
+- Modify: `src/game/scenes/HideoutScene.ts`
+- Modify: `src/game/world/DungeonAssembler.ts`
+- Create: `src/game/runtime/SceneRuntimeHost.ts`
+- Test: `tests/integration/dungeon-runtime.test.ts`
+- Test: `tests/integration/scene-runtime-lifecycle.test.ts`
 
 **Interfaces:**
 - Consumes: PlayerRuntime, EnemyRuntime, LootRuntime, CombatRuntime, GameplayControlState, DungeonAssembler.
-- Produces: \`SceneRuntimeHost\` that owns subscriptions/runtime objects and disposes all listeners on scene shutdown.
+- Produces: `SceneRuntimeHost` that owns subscriptions/runtime objects and disposes all listeners on scene shutdown.
 
 - [ ] **Step 1: Write listener lifecycle test**
 
-\`\`\`ts
+```ts
 it('disposes runtime listeners exactly once across repeated scene mounts', () => {
   const controls = new GameplayControlState();
   const first = new SceneRuntimeHost(controls);
@@ -891,7 +892,7 @@ it('disposes runtime listeners exactly once across repeated scene mounts', () =>
   expect(secondSpy).toHaveBeenCalledTimes(1);
   second.dispose();
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Verify RED and implement SceneRuntimeHost**
 
@@ -909,7 +910,7 @@ No singleton Phaser runtime objects.
 
 Add encounter placement metadata:
 
-\`\`\`ts
+```ts
 export interface AssembledRoomPlacement {
   definitionId: string;
   x: number;
@@ -918,13 +919,13 @@ export interface AssembledRoomPlacement {
   encounterIds: string[];
   trapIds: string[];
 }
-\`\`\`
+```
 
-Resolve metadata from \`dungeonRoomDefinitions\` by definition ID.
+Resolve metadata from `dungeonRoomDefinitions` by definition ID.
 
 - [ ] **Step 4: Add deterministic dungeon runtime test**
 
-\`\`\`ts
+```ts
 it('assembles identical encounter placements for the same generated dungeon', () => {
   const generatedA = generateDungeon(1234, dungeonRoomDefinitions);
   const generatedB = generateDungeon(1234, dungeonRoomDefinitions);
@@ -933,7 +934,7 @@ it('assembles identical encounter placements for the same generated dungeon', ()
   expect(new DungeonAssembler(dungeonRoomDefinitions).assemble(generatedA.dungeon))
     .toEqual(new DungeonAssembler(dungeonRoomDefinitions).assemble(generatedB.dungeon));
 });
-\`\`\`
+```
 
 - [ ] **Step 5: Replace ForestScene placeholder movement**
 
@@ -942,7 +943,7 @@ ForestScene must:
 - create runtime enemies from the existing five definitions;
 - update runtime with actual Phaser keyboard/pointer input;
 - create visual telegraphs from runtime frames;
-- perform overlap/contact queries and call \`CombatRuntime.tryHit\`;
+- perform overlap/contact queries and call `CombatRuntime.tryHit`;
 - spawn loot on enemy death;
 - process E interaction through LootRuntime;
 - update Phaser positions from runtime state;
@@ -958,35 +959,35 @@ HideoutScene must:
 
 - [ ] **Step 7: Verify scene integration and commit**
 
-\`\`\`bash
+```bash
 npm test -- tests/integration/dungeon-runtime.test.ts tests/integration/scene-runtime-lifecycle.test.ts tests/integration/runtime-combat-loop.test.ts
 npm test
 npm run typecheck
 git add src/game/scenes/ForestScene.ts src/game/scenes/HideoutScene.ts src/game/world/DungeonAssembler.ts src/game/runtime/SceneRuntimeHost.ts tests/integration/dungeon-runtime.test.ts tests/integration/scene-runtime-lifecycle.test.ts
 git commit -m "feat: run real combat and loot in forest and hideout"
-\`\`\`
+```
 
 ---
 
 ### Task 9: BossRuntime and Real Bandit Leader Fight
 
 **Files:**
-- Create: \`src/game/runtime/BossRuntime.ts\`
-- Modify: \`src/game/scenes/BossScene.ts\`
-- Modify: \`src/domain/ai/bossBrain.ts\` only if a missing state-transition primitive is required.
-- Test: \`tests/unit/boss-runtime.test.ts\`
-- Modify/Test: \`tests/unit/boss-brain.test.ts\`
+- Create: `src/game/runtime/BossRuntime.ts`
+- Modify: `src/game/scenes/BossScene.ts`
+- Modify: `src/domain/ai/bossBrain.ts` only if a missing state-transition primitive is required.
+- Test: `tests/unit/boss-runtime.test.ts`
+- Modify/Test: `tests/unit/boss-brain.test.ts`
 
 **Interfaces:**
 - Consumes: boss brain move selection, CombatRuntime, PlayerRuntime target contract, fixed leader definition.
 - Produces:
-  - \`BossRuntime.update(playerObservation, dtMs): BossRuntimeFrame\`
+  - `BossRuntime.update(playerObservation, dtMs): BossRuntimeFrame`
   - explicit telegraph/active/recovery phases;
   - one-time victory result.
 
 - [ ] **Step 1: Write phase-integrity test**
 
-\`\`\`ts
+```ts
 it('changes phase behavior without changing max hp or armor', () => {
   const boss = makeBossRuntime();
   const initial = boss.snapshot;
@@ -1000,11 +1001,11 @@ it('changes phase behavior without changing max hp or armor', () => {
   expect(boss.snapshot.maxHp).toBe(initial.maxHp);
   expect(boss.snapshot.armor).toBe(initial.armor);
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Write boss action-state test**
 
-\`\`\`ts
+```ts
 it('telegraphs before opening a damaging move window and recovers afterward', () => {
   const boss = makeBossRuntime();
   const first = boss.update({ distance: 60 }, 16);
@@ -1017,22 +1018,22 @@ it('telegraphs before opening a damaging move window and recovers afterward', ()
   advanceUntilRecovery(boss);
   expect(boss.frame.recovering).toBe(true);
 });
-\`\`\`
+```
 
 - [ ] **Step 3: Verify RED and implement BossRuntime**
 
-Use \`stepBanditLeaderBrain\` for move selection, then runtime-local timing for \`telegraphMs/activeMs/recoveryMs\` from the chosen move definition. Damage windows go through CombatRuntime.
+Use `stepBanditLeaderBrain` for move selection, then runtime-local timing for `telegraphMs/activeMs/recoveryMs` from the chosen move definition. Damage windows go through CombatRuntime.
 
 - [ ] **Step 4: Add one-time victory test**
 
-\`\`\`ts
+```ts
 it('resolves victory only once', () => {
   const boss = makeBossRuntime();
   boss.setHp(0);
   expect(boss.consumeVictory().resolved).toBe(true);
   expect(boss.consumeVictory().resolved).toBe(false);
 });
-\`\`\`
+```
 
 On first resolution, the scene/session integration must:
 - update quest;
@@ -1042,29 +1043,29 @@ On first resolution, the scene/session integration must:
 
 - [ ] **Step 5: Replace click-to-damage BossScene**
 
-Delete \`boss.on('pointerdown', () => this.hitBoss())\` and the hard-coded 45-damage path. BossScene must use the same PlayerRuntime controls as the other combat scenes and drive BossRuntime in \`update()\`.
+Delete `boss.on('pointerdown', () => this.hitBoss())` and the hard-coded 45-damage path. BossScene must use the same PlayerRuntime controls as the other combat scenes and drive BossRuntime in `update()`.
 
 - [ ] **Step 6: Verify and commit**
 
-\`\`\`bash
+```bash
 npm test -- boss-runtime.test.ts boss-brain.test.ts tests/integration/runtime-combat-loop.test.ts
 npm test
 npm run typecheck
 git add src/game/runtime/BossRuntime.ts src/game/scenes/BossScene.ts src/domain/ai/bossBrain.ts tests/unit/boss-runtime.test.ts tests/unit/boss-brain.test.ts
 git commit -m "feat: replace click boss with runtime boss combat"
-\`\`\`
+```
 
 ---
 
 ### Task 10: Correct Equipment and Skill UI Wiring
 
 **Files:**
-- Modify: \`src/ui/inventory/InventoryPanel.tsx\`
-- Modify: \`src/ui/equipment/EquipmentPanel.tsx\`
-- Modify: \`src/ui/skills/SkillTreePanel.tsx\`
-- Modify: \`src/ui/inventory/ItemTooltip.tsx\`
-- Test: \`tests/unit/ui-inventory.test.tsx\`
-- Create/Test: \`tests/unit/ui-skills.test.tsx\`
+- Modify: `src/ui/inventory/InventoryPanel.tsx`
+- Modify: `src/ui/equipment/EquipmentPanel.tsx`
+- Modify: `src/ui/skills/SkillTreePanel.tsx`
+- Modify: `src/ui/inventory/ItemTooltip.tsx`
+- Test: `tests/unit/ui-inventory.test.tsx`
+- Create/Test: `tests/unit/ui-skills.test.tsx`
 
 **Interfaces:**
 - Consumes: item definitions, assigned skill slots, bridge commands.
@@ -1072,7 +1073,7 @@ git commit -m "feat: replace click boss with runtime boss combat"
 
 - [ ] **Step 1: Add failing equipment-slot UI test**
 
-\`\`\`tsx
+```tsx
 it('dispatches the item declared equipment slot instead of hardcoding weapon', () => {
   seedInventoryWith('shadow_cowl', 'cowl-1');
   const spy = vi.fn();
@@ -1089,15 +1090,15 @@ it('dispatches the item declared equipment slot instead of hardcoding weapon', (
   });
   off();
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Verify RED and fix InventoryPanel**
 
-Resolve the selected item's definition from the content registry and only render Equip for gear with an \`equipSlot\`. Dispatch that exact slot.
+Resolve the selected item's definition from the content registry and only render Equip for gear with an `equipSlot`. Dispatch that exact slot.
 
 - [ ] **Step 3: Add failing active-slot UI test**
 
-\`\`\`tsx
+```tsx
 it('assigns a learned active skill to a selected hotbar slot', () => {
   seedLearnedSkill('assassin_shadow_dash');
   const spy = vi.fn();
@@ -1114,11 +1115,11 @@ it('assigns a learned active skill to a selected hotbar slot', () => {
   });
   off();
 });
-\`\`\`
+```
 
 - [ ] **Step 4: Implement four active-slot controls**
 
-Show current \`equippedActiveSkillIds\` and allow assignment only for learned active nodes. Keep domain validation authoritative.
+Show current `equippedActiveSkillIds` and allow assignment only for learned active nodes. Keep domain validation authoritative.
 
 - [ ] **Step 5: Verify pause UI state**
 
@@ -1126,24 +1127,24 @@ Add Testing Library coverage that PauseMenu toggling calls the shared gameplay c
 
 - [ ] **Step 6: Verify and commit**
 
-\`\`\`bash
+```bash
 npm test -- ui-inventory.test.tsx ui-skills.test.tsx gameplay-control-state.test.ts
 npm test
 git add src/ui/inventory/InventoryPanel.tsx src/ui/equipment/EquipmentPanel.tsx src/ui/skills/SkillTreePanel.tsx src/ui/inventory/ItemTooltip.tsx tests/unit/ui-inventory.test.tsx tests/unit/ui-skills.test.tsx
 git commit -m "fix: wire equipment slots and active skill hotbar"
-\`\`\`
+```
 
 ---
 
 ### Task 11: Replace Shortcut E2E with Real Runtime Acceptance Flow
 
 **Files:**
-- Modify: \`tests/e2e/vertical-slice.spec.ts\`
-- Modify: \`src/ui/test/TestFlowPanel.tsx\`
-- Modify: \`src/app/App.tsx\`
-- Modify: \`playwright.config.ts\`
+- Modify: `tests/e2e/vertical-slice.spec.ts`
+- Modify: `src/ui/test/TestFlowPanel.tsx`
+- Modify: `src/app/App.tsx`
+- Modify: `playwright.config.ts`
 - Modify: runtime test-mode configuration files created in Tasks 5–9.
-- Test: \`tests/e2e/vertical-slice.spec.ts\`
+- Test: `tests/e2e/vertical-slice.spec.ts`
 
 **Interfaces:**
 - Consumes: actual Phaser canvas input, React quest/inventory/skill UI, deterministic test-mode timing/RNG.
@@ -1152,9 +1153,9 @@ git commit -m "fix: wire equipment slots and active skill hotbar"
 - [ ] **Step 1: Remove progression shortcuts**
 
 Delete or reduce TestFlowPanel so it cannot call:
-- \`completeForestEncounter()\`;
-- \`grantLoot()\`;
-- \`markBanditLeaderDefeated()\`;
+- `completeForestEncounter()`;
+- `grantLoot()`;
+- `markBanditLeaderDefeated()`;
 - direct quest milestones;
 - direct boss kill.
 
@@ -1164,7 +1165,7 @@ If a diagnostics panel remains, it may display seed/screen/runtime state only.
 
 Expose a read-only config:
 
-\`\`\`ts
+```ts
 export interface RuntimeTuning {
   rngSeed: number;
   enemyHpMultiplier: number;
@@ -1176,15 +1177,15 @@ export const TEST_RUNTIME_TUNING: RuntimeTuning = {
   enemyHpMultiplier: 0.25,
   timingMultiplier: 0.35,
 };
-\`\`\`
+```
 
-Production defaults remain \`1.0\` multipliers. Test mode must not skip gameplay transitions.
+Production defaults remain `1.0` multipliers. Test mode must not skip gameplay transitions.
 
 - [ ] **Step 3: Rewrite the primary Playwright test**
 
 The test must use normal controls. Its structure:
 
-\`\`\`ts
+```ts
 test('vertical slice completes through real runtime input and persists', async ({ page }) => {
   await page.goto('/?testMode=1');
 
@@ -1225,20 +1226,20 @@ test('vertical slice completes through real runtime input and persists', async (
   await expect(page.getByText('Status: completed')).toBeVisible();
   await expect(page.getByText(/steel_dagger/i)).toBeVisible();
 });
-\`\`\`
+```
 
-Implement \`reachHideoutThroughInput\`, \`defeatBossThroughCombatInput\`, and \`returnToOutpostThroughInput\` as test helpers that use keyboard/mouse only; they must not evaluate page-side session methods.
+Implement `reachHideoutThroughInput`, `defeatBossThroughCombatInput`, and `returnToOutpostThroughInput` as test helpers that use keyboard/mouse only; they must not evaluate page-side session methods.
 
 - [ ] **Step 4: Add an anti-bypass assertion**
 
 Before gameplay, assert the page has no buttons named:
-- \`Defeat encounter\`;
-- \`Pick up test loot\`;
-- \`Defeat boss\`.
+- `Defeat encounter`;
+- `Pick up test loot`;
+- `Defeat boss`.
 
-\`\`\`ts
+```ts
 await expect(page.getByRole('button', { name: 'Defeat boss' })).toHaveCount(0);
-\`\`\`
+```
 
 - [ ] **Step 5: Preserve repeated-transition/listener coverage**
 
@@ -1246,21 +1247,21 @@ Rewrite the second E2E to traverse scene gates normally and assert one inventory
 
 - [ ] **Step 6: Run E2E and full verification**
 
-\`\`\`bash
+```bash
 npm run typecheck
 npm test
 npm run build
 npm run test:e2e
-\`\`\`
+```
 
 Expected: all PASS.
 
 - [ ] **Step 7: Commit**
 
-\`\`\`bash
+```bash
 git add tests/e2e/vertical-slice.spec.ts src/ui/test/TestFlowPanel.tsx src/app/App.tsx playwright.config.ts src/game/runtime
 git commit -m "test: validate vertical slice through real gameplay"
-\`\`\`
+```
 
 ---
 
@@ -1268,8 +1269,8 @@ git commit -m "test: validate vertical slice through real gameplay"
 
 **Files:**
 - Modify tests only where a missing review-focus regression is discovered.
-- Modify: \`README.md\`
-- Modify: \`docs/superpowers/specs/2026-09-19-runtime-integration-design.md\` only if implementation revealed a spec correction that must be recorded before merge.
+- Modify: `README.md`
+- Modify: `docs/superpowers/specs/2026-09-19-runtime-integration-design.md` only if implementation revealed a spec correction that must be recorded before merge.
 - No feature expansion.
 
 **Interfaces:**
@@ -1280,18 +1281,18 @@ git commit -m "test: validate vertical slice through real gameplay"
 
 If not already covered by Task 5, add:
 
-\`\`\`ts
+```ts
 it('does not start an attack on the same frame an accepted dodge begins', () => {
   const runtime = makePlayerRuntime();
   const frame = runtime.update(makeInput({ dodgePressed: true, basicAttackPressed: true }), 16);
   expect(frame.dodgeStarted).toBe(true);
   expect(frame.attackStarted).toBe(false);
 });
-\`\`\`
+```
 
 - [ ] **Step 2: Add explicit stale-reference derived-stat regression**
 
-\`\`\`ts
+```ts
 it('stale equipment and unknown skills never contribute derived stats', () => {
   const state = createInitialGameState();
   state.equipment.weapon = 'gone';
@@ -1299,11 +1300,11 @@ it('stale equipment and unknown skills never contribute derived stats', () => {
   const stats = deriveCombatStats(state, buildContentRegistry());
   expect(stats.attackPower).toBe(ROGUE_BASE_STATS.attackPower);
 });
-\`\`\`
+```
 
 - [ ] **Step 3: Add boss no-inflation regression**
 
-\`\`\`ts
+```ts
 it('all boss phases retain the authored hp and armor values', () => {
   const boss = makeBossRuntime();
   const authored = { maxHp: boss.snapshot.maxHp, armor: boss.snapshot.armor };
@@ -1312,16 +1313,16 @@ it('all boss phases retain the authored hp and armor values', () => {
     expect({ maxHp: boss.snapshot.maxHp, armor: boss.snapshot.armor }).toEqual(authored);
   }
 });
-\`\`\`
+```
 
 - [ ] **Step 4: Run all four completion gates fresh**
 
-\`\`\`bash
+```bash
 npm run typecheck
 npm test
 npm run build
 npm run test:e2e
-\`\`\`
+```
 
 Expected: all commands exit 0.
 
@@ -1336,12 +1337,12 @@ Document:
 
 - [ ] **Step 6: Commit final integration verification**
 
-\`\`\`bash
+```bash
 git add README.md tests src
 git commit -m "chore: close runtime integration review blockers"
-\`\`\`
+```
 
-- [ ] **Step 7: Push the updated \`vertical-slice\` branch and wait for GitHub Actions**
+- [ ] **Step 7: Push the updated `vertical-slice` branch and wait for GitHub Actions**
 
 Expected GitHub Actions steps:
 - Install dependencies;
