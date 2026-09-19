@@ -146,6 +146,20 @@ async function defeatRuntimeBoss(page: Page, maxEngagements = 20): Promise<{ x: 
   throw new Error(`Boss not defeated after ${maxEngagements} engagements: playerHp=${hp}, player=${JSON.stringify(player)}, enemies=${JSON.stringify(enemies)}, lastBoss=${JSON.stringify(lastKnown)}`);
 }
 
+
+async function useHealthPotionIfNeeded(page: Page): Promise<void> {
+  const hpText = (await page.getByTestId('runtime-player-hp').textContent())?.trim() ?? '100';
+  if (Number(hpText) >= 90) return;
+
+  await page.getByRole('button', { name: /Inventory/ }).click();
+  const potion = page.getByRole('button', { name: /health_potion/ }).first();
+  await expect(potion).toBeVisible();
+  await potion.click();
+  await page.getByRole('button', { name: 'Use health potion' }).click();
+  await page.getByRole('button', { name: 'Close' }).click();
+  await expect.poll(async () => Number((await page.getByTestId('runtime-player-hp').textContent()) ?? '0')).toBeGreaterThan(40);
+}
+
 async function equipFirstGear(page: Page): Promise<void> {
   await page.getByRole('button', { name: /Inventory/ }).click();
   const gearIds = [
@@ -200,6 +214,7 @@ test('vertical slice completes through real runtime input and survives reload', 
   await waitForScreen(page, 'hideout');
 
   await clearRuntimeEnemies(page, 40);
+  await useHealthPotionIfNeeded(page);
   await pressUntilScreen(page, 'KeyE', 'boss');
 
   const bossDropPosition = await defeatRuntimeBoss(page);
