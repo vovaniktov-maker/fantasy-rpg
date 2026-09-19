@@ -48,9 +48,6 @@ export class ForestScene extends Phaser.Scene {
   private keyA?: Phaser.Input.Keyboard.Key;
   private keyS?: Phaser.Input.Keyboard.Key;
   private keyD?: Phaser.Input.Keyboard.Key;
-  private keySpace?: Phaser.Input.Keyboard.Key;
-  private keyInteract?: Phaser.Input.Keyboard.Key;
-  private skillKeys: Phaser.Input.Keyboard.Key[] = [];
   private readonly actionBuffer = new GameplayActionBuffer();
   private syncElapsed = 0;
   private encounterResolved = false;
@@ -124,11 +121,18 @@ export class ForestScene extends Phaser.Scene {
     this.keyA = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.keyS = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.S);
     this.keyD = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    this.keySpace = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    this.keyInteract = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-    this.skillKeys = [1, 2, 3, 4].map((value) => keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ONE + value - 1));
 
     this.host = new SceneRuntimeHost(gameplayControlState);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'KeyE') this.actionBuffer.queueInteract();
+      if (event.code === 'Space') this.actionBuffer.queueDodge();
+      if (event.code.startsWith('Digit')) {
+        const slotIndex = Number(event.code.slice(5)) - 1;
+        this.actionBuffer.queueSkillSlot(slotIndex);
+      }
+    };
+    this.input.keyboard?.on('keydown', onKeyDown);
+    this.host.own(() => this.input.keyboard?.off('keydown', onKeyDown));
     const onPointerDown = (pointer: Phaser.Input.Pointer) => {
       if (pointer.leftButtonDown()) this.actionBuffer.queueBasicAttack();
     };
@@ -147,15 +151,15 @@ export class ForestScene extends Phaser.Scene {
     this.playerRuntime.setControls(controls);
     if (!controls.inputEnabled) this.actionBuffer.clear();
     const pointer = this.input.activePointer;
-    const skillIndex = this.skillKeys.findIndex((key) => Phaser.Input.Keyboard.JustDown(key));
+    const skillIndex = controls.inputEnabled ? this.actionBuffer.consumeSkillSlot() : null;
     const frame = this.playerRuntime.update({
       moveX: Number(this.keyD?.isDown) - Number(this.keyA?.isDown),
       moveY: Number(this.keyS?.isDown) - Number(this.keyW?.isDown),
       aimX: pointer.worldX,
       aimY: pointer.worldY,
       basicAttackPressed: controls.inputEnabled ? this.actionBuffer.consumeBasicAttack() : false,
-      dodgePressed: controls.inputEnabled && !!this.keySpace && Phaser.Input.Keyboard.JustDown(this.keySpace),
-      skillSlotPressed: controls.inputEnabled && skillIndex >= 0 ? skillIndex : null,
+      dodgePressed: controls.inputEnabled ? this.actionBuffer.consumeDodge() : false,
+      skillSlotPressed: controls.inputEnabled && skillIndex !== null ? skillIndex : null,
     }, dtMs);
 
     const player = this.playerRuntime.snapshot;
@@ -211,7 +215,7 @@ export class ForestScene extends Phaser.Scene {
       this.add.text(470, 105, 'Patrol defeated — collect loot, then press E', { color: '#cde5b8' });
     }
 
-    if (controls.inputEnabled && this.keyInteract && Phaser.Input.Keyboard.JustDown(this.keyInteract)) {
+    if (controls.inputEnabled && this.actionBuffer.consumeInteract()) {
       const interaction = this.lootRuntime.tryInteract(player.position);
       if (interaction.collected && interaction.pickup) {
         this.lootSprites.get(interaction.pickup.id)?.destroy();
