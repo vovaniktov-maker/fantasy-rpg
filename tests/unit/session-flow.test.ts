@@ -26,6 +26,13 @@ function potion(instanceId: string, definitionId: 'health_potion' | 'energy_poti
 }
 
 describe('GameSession', () => {
+  it('starts a new character with one health potion for the first expedition', () => {
+    const { session } = makeSession();
+    const state = session.startNew();
+
+    expect(state.inventory.slots.some((slot) => slot?.definitionId === 'health_potion' && slot.quantity === 1)).toBe(true);
+  });
+
   it('instantly consumes one health potion and respects shared cooldown', () => {
     let now = 1_000;
     const { session } = makeSession(() => now);
