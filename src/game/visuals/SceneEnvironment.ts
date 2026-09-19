@@ -1,10 +1,14 @@
 import Phaser from 'phaser';
 
-function floor(scene: Phaser.Scene, key: string): void {
+interface EnvironmentScene {
+  add: Phaser.GameObjects.GameObjectFactory;
+}
+
+function floor(scene: EnvironmentScene, key: string): void {
   scene.add.tileSprite(640, 360, 1280, 720, key).setDepth(-20);
 }
 
-export function buildOutpostEnvironment(scene: Phaser.Scene): void {
+export function buildOutpostEnvironment(scene: EnvironmentScene): void {
   floor(scene, 'tile-dirt');
   scene.add.tileSprite(640, 560, 1280, 220, 'tile-stone').setDepth(-15).setAlpha(0.55);
   [[210,215],[1030,230],[970,500]].forEach(([x,y]) => scene.add.image(x,y,'prop-tent').setScale(1.35).setDepth(y));
@@ -15,7 +19,7 @@ export function buildOutpostEnvironment(scene: Phaser.Scene): void {
   scene.add.image(690,610,'prop-torch').setDepth(610);
 }
 
-export function buildForestEnvironment(scene: Phaser.Scene): void {
+export function buildForestEnvironment(scene: EnvironmentScene): void {
   floor(scene, 'tile-grass');
   scene.add.tileSprite(650,360,340,760,'tile-dirt').setRotation(0.04).setDepth(-15).setAlpha(0.78);
   const trees = [[90,120],[185,90],[1090,105],[1185,150],[100,600],[220,640],[1080,615],[1190,570],[315,125],[960,110],[330,650],[950,645]];
@@ -24,7 +28,7 @@ export function buildForestEnvironment(scene: Phaser.Scene): void {
   scene.add.image(555,150,'prop-campfire').setScale(0.8).setDepth(150).setAlpha(0.75);
 }
 
-export function buildHideoutEnvironment(scene: Phaser.Scene): void {
+export function buildHideoutEnvironment(scene: EnvironmentScene): void {
   floor(scene, 'tile-stone');
   scene.add.tileSprite(640,390,1040,500,'tile-wood').setDepth(-15).setAlpha(0.32);
   for (let x=80; x<=1200; x+=64) {
@@ -36,7 +40,7 @@ export function buildHideoutEnvironment(scene: Phaser.Scene): void {
   scene.add.image(1160,360,'prop-banner').setScale(1.3).setDepth(360);
 }
 
-export function buildBossEnvironment(scene: Phaser.Scene): void {
+export function buildBossEnvironment(scene: EnvironmentScene): void {
   floor(scene, 'tile-stone');
   scene.add.rectangle(640,365,930,500,0x27191c,0.55).setStrokeStyle(5,0x5e3139,0.8).setDepth(-15);
   scene.add.circle(640,365,220,0x411f29,0.22).setStrokeStyle(3,0x75404a,0.45).setDepth(-14);
