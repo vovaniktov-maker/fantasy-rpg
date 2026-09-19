@@ -5,6 +5,7 @@ import { buildContentRegistry } from '../../domain/content/contentRegistry.js';
 import { generateDungeon } from '../../domain/dungeon/dungeonGenerator.js';
 import { deriveCombatStats } from '../../domain/stats/DerivedStatsService.js';
 import { getDefaultGameSession } from '../GameSession.js';
+import { GameplayActionBuffer } from '../input/GameplayActionBuffer.js';
 import { gameplayControlState, type GameplayControlSnapshot } from '../runtime/GameplayControlState.js';
 import { CombatRuntime } from '../runtime/CombatRuntime.js';
 import { EnemyRuntime } from '../runtime/EnemyRuntime.js';
@@ -45,7 +46,7 @@ export class HideoutScene extends Phaser.Scene {
   private readonly lootSprites = new Map<string, Phaser.GameObjects.Image>();
   private keys: Partial<Record<'W'|'A'|'S'|'D'|'SPACE'|'E', Phaser.Input.Keyboard.Key>> = {};
   private skillKeys: Phaser.Input.Keyboard.Key[] = [];
-  private pointerWasDown = false;
+  private readonly actionBuffer = new GameplayActionBuffer();
   private syncElapsed = 0;
   private cleared = false;
   private rng = seededRandom(1);
@@ -123,6 +124,11 @@ export class HideoutScene extends Phaser.Scene {
       .map((code) => keyboard.addKey(code));
 
     this.host = new SceneRuntimeHost(gameplayControlState);
+    const onPointerDown = (pointer: Phaser.Input.Pointer) => {
+      if (pointer.leftButtonDown()) this.actionBuffer.queueBasicAttack();
+    };
+    this.input.on('pointerdown', onPointerDown);
+    this.host.own(() => this.input.off('pointerdown', onPointerDown));
     this.host.onFrame((dtMs, controls) => this.stepRuntime(dtMs, controls));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.host?.dispose());
   }
@@ -132,19 +138,18 @@ export class HideoutScene extends Phaser.Scene {
   private stepRuntime(dtMs: number, controls: Readonly<GameplayControlSnapshot>): void {
     if (!this.playerRuntime || !this.playerSprite || !this.combat || !this.lootRuntime) return;
     this.playerRuntime.setControls(controls);
+    if (!controls.inputEnabled) this.actionBuffer.clear();
     const pointer = this.input.activePointer;
-    const pointerDown = pointer.leftButtonDown();
     const skillIndex = this.skillKeys.findIndex((key) => Phaser.Input.Keyboard.JustDown(key));
     const frame = this.playerRuntime.update({
       moveX: Number(this.keys.D?.isDown) - Number(this.keys.A?.isDown),
       moveY: Number(this.keys.S?.isDown) - Number(this.keys.W?.isDown),
       aimX: pointer.worldX,
       aimY: pointer.worldY,
-      basicAttackPressed: controls.inputEnabled && pointerDown && !this.pointerWasDown,
+      basicAttackPressed: controls.inputEnabled ? this.actionBuffer.consumeBasicAttack() : false,
       dodgePressed: controls.inputEnabled && !!this.keys.SPACE && Phaser.Input.Keyboard.JustDown(this.keys.SPACE),
       skillSlotPressed: controls.inputEnabled && skillIndex >= 0 ? skillIndex : null,
     }, dtMs);
-    this.pointerWasDown = pointerDown;
     const player = this.playerRuntime.snapshot;
     this.playerSprite.setPosition(player.position.x, player.position.y).setRotation(player.facingRadians);
 
