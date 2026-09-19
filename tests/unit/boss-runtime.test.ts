@@ -45,6 +45,32 @@ describe('BossRuntime', () => {
     }
   });
 
+  it('emits a one-shot movement intent for authored reposition moves', () => {
+    const boss = new BossRuntime({ combat: new CombatRuntime(() => 0.5), timingMultiplier: 1 });
+    const observation = { distance: 200, directionToPlayer: { x: 1, y: 0 } };
+
+    const finishMove = () => {
+      boss.update(observation, 1);
+      boss.update(observation, 2_000);
+      boss.update(observation, 2_000);
+      boss.update(observation, 2_000);
+    };
+
+    finishMove(); // fast_combo
+    finishMove(); // thrown_knives
+    finishMove(); // poison_strike
+
+    const telegraph = boss.update(observation, 1);
+    expect(telegraph.telegraph?.moveId).toBe('smoke_reposition');
+
+    const active = boss.update(observation, 2_000);
+    expect(active.movement).toBeDefined();
+    expect(Math.hypot(active.movement!.x, active.movement!.y)).toBeGreaterThan(0);
+
+    const nextFrame = boss.update(observation, 1);
+    expect(nextFrame.movement).toBeUndefined();
+  });
+
   it('resolves victory only once', () => {
     const boss = new BossRuntime({ combat: new CombatRuntime(() => 0.5) });
     boss.setHp(0);
