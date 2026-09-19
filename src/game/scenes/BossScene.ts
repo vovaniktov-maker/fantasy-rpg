@@ -147,7 +147,9 @@ export class BossScene extends Phaser.Scene {
     const boss = this.bossRuntime.snapshot;
     const bossX = this.bossSprite.x;
     const bossY = this.bossSprite.y;
-    const distance = Math.hypot(player.position.x - bossX, player.position.y - bossY);
+    const dxToPlayer = player.position.x - bossX;
+    const dyToPlayer = player.position.y - bossY;
+    const distance = Math.hypot(dxToPlayer, dyToPlayer);
 
     for (const attackId of [playerFrame.attackWindowId, playerFrame.skillAttackWindowId].filter((id): id is string => !!id)) {
       if (distance <= 135) {
@@ -161,12 +163,25 @@ export class BossScene extends Phaser.Scene {
       }
     }
 
-    const bossFrame = this.bossRuntime.update({ distance }, dtMs);
+    const bossFrame = this.bossRuntime.update({
+      distance,
+      directionToPlayer: { x: dxToPlayer, y: dyToPlayer },
+    }, dtMs);
+    if (bossFrame.movement) {
+      this.bossSprite.setPosition(
+        Phaser.Math.Clamp(this.bossSprite.x + bossFrame.movement.x, 120, 1160),
+        Phaser.Math.Clamp(this.bossSprite.y + bossFrame.movement.y, 120, 600),
+      );
+    }
     if (bossFrame.telegraph) this.bossSprite.setTint(0xe6b84a);
     else if (bossFrame.attackWindowId) this.bossSprite.setTint(0xd33245);
     else if (!this.victoryResolved) this.bossSprite.setTint(0xc24d4d);
 
-    if (bossFrame.attackWindowId && distance <= 230) {
+    const bossAttackDistance = Math.hypot(
+      player.position.x - this.bossSprite.x,
+      player.position.y - this.bossSprite.y,
+    );
+    if (bossFrame.attackWindowId && bossAttackDistance <= 230) {
       this.combat.tryHit(bossFrame.attackWindowId, this.playerRuntime.getCombatTarget());
     }
 
@@ -186,8 +201,10 @@ export class BossScene extends Phaser.Scene {
           itemLevel: session.getState().progression.level,
           rarity: definition?.uniqueEffect ? 'unique' : 'rare',
         };
-        const pickup = this.lootRuntime.spawnDrop({ item, position: { x: bossX, y: bossY } });
-        this.lootSprites.set(pickup.id, this.add.image(bossX, bossY, 'loot-placeholder').setScale(0.9));
+        const dropX = this.bossSprite.x;
+        const dropY = this.bossSprite.y;
+        const pickup = this.lootRuntime.spawnDrop({ item, position: { x: dropX, y: dropY } });
+        this.lootSprites.set(pickup.id, this.add.image(dropX, dropY, 'loot-placeholder').setScale(0.9));
       }
       this.add.text(500, 500, 'Leader defeated — collect the drop, then press E to return', { color: '#e8d8b0', fontSize: '18px' });
     }
