@@ -18,6 +18,9 @@ import { runtimeDiagnostics } from '../runtime/RuntimeDiagnostics.js';
 import { createRuntimeRandom, deriveRuntimeSeed } from '../runtime/RuntimeRandom.js';
 import { DungeonAssembler } from '../world/DungeonAssembler.js';
 import { DungeonEncounterGate } from '../world/DungeonEncounterGate.js';
+import { enemyTextureKey, getRarityColor, itemTextureKey } from '../visuals/VisualCatalog.js';
+import { buildHideoutEnvironment } from '../visuals/SceneEnvironment.js';
+import { clearTelegraph, drawAttackActive, drawAttackTelegraph, playDodgeSmoke, playSlash } from '../visuals/CombatVisuals.js';
 
 const CONTENT = buildContentRegistry();
 
@@ -37,7 +40,7 @@ export class HideoutScene extends Phaser.Scene {
   private playerSprite?: Phaser.GameObjects.Image;
   private combat?: CombatRuntime;
   private lootRuntime?: LootRuntime;
-  private readonly enemies: Array<{ runtime: EnemyRuntime; image: Phaser.GameObjects.Image; definition: EnemyDefinition; roomIndex: number }> = [];
+  private readonly enemies: Array<{ runtime: EnemyRuntime; image: Phaser.GameObjects.Image; definition: EnemyDefinition; roomIndex: number; telegraph: Phaser.GameObjects.Graphics }> = [];
   private readonly lootSprites = new Map<string, Phaser.GameObjects.Image>();
   private keys: Partial<Record<'W'|'A'|'S'|'D', Phaser.Input.Keyboard.Key>> = {};
   private readonly actionBuffer = new GameplayActionBuffer();
@@ -68,6 +71,7 @@ export class HideoutScene extends Phaser.Scene {
     this.encounterGate = new DungeonEncounterGate(rooms.map((room) => room.encounterIds.length));
 
     this.cameras.main.setBackgroundColor('#17120f');
+    buildHideoutEnvironment(this);
     this.add.text(32, 24, 'Bandit Hideout', { color: '#d5c0a0', fontSize: '24px' });
     this.add.text(32, 58, `Run seed ${state.runSeed} · clear the route · E opens the boss door`, { color: '#9b8a74' });
 
@@ -82,7 +86,7 @@ export class HideoutScene extends Phaser.Scene {
       equippedSkills: state.skills.equippedActiveSkillIds,
       combat: this.combat,
     });
-    this.playerSprite = this.add.image(120, 360, 'rogue-placeholder').setScale(1.25);
+    this.playerSprite = this.add.image(120, 360, 'rogue').setScale(1.35).setDepth(360);
 
     this.lootRuntime = new LootRuntime({
       content: CONTENT,
@@ -111,10 +115,12 @@ export class HideoutScene extends Phaser.Scene {
           position: { x, y },
           combat: this.combat,
         });
-        const image = this.add.image(x, y, 'bandit-placeholder')
-          .setTint(0x6e4334)
+        const image = this.add.image(x, y, enemyTextureKey(definition.id))
+          .setScale(definition.archetype === 'heavy' ? 1.18 : 1.08)
+          .setDepth(y)
           .setVisible(this.encounterGate.isRoomActive(roomIndex));
-        this.enemies.push({ runtime, image, definition, roomIndex });
+        const telegraph = this.add.graphics().setDepth(y - 1);
+        this.enemies.push({ runtime, image, definition, roomIndex, telegraph });
         enemyIndex += 1;
         enemyInRoom += 1;
       }
@@ -171,7 +177,9 @@ export class HideoutScene extends Phaser.Scene {
       skillSlotPressed: controls.inputEnabled && skillIndex !== null ? skillIndex : null,
     }, dtMs);
     const player = this.playerRuntime.snapshot;
-    this.playerSprite.setPosition(player.position.x, player.position.y).setRotation(player.facingRadians);
+    this.playerSprite.setPosition(player.position.x, player.position.y).setRotation(player.facingRadians).setDepth(player.position.y);
+    if (frame.attackStarted || frame.skillStarted) playSlash(this, player.position.x, player.position.y, player.facingRadians);
+    if (frame.dodgeStarted) playDodgeSmoke(this, player.position.x, player.position.y);
 
     const attackIds = [frame.attackWindowId, frame.skillAttackWindowId].filter((id): id is string => !!id);
     for (const entry of this.enemies) {
@@ -188,8 +196,19 @@ export class HideoutScene extends Phaser.Scene {
         directionToPlayer: { x: dx, y: dy },
       }, dtMs);
       const next = entry.runtime.snapshot;
-      entry.image.setPosition(next.x, next.y);
-      entry.image.setTint(enemyFrame.telegraph ? 0xe6b84a : enemyFrame.attackWindowId ? 0xc83a3a : 0x6e4334);
+      entry.image.setPosition(next.x, next.y).setDepth(next.y);
+      entry.telegraph.setDepth(next.y - 1);
+      const attackRadius = Math.min(110, Math.max(...entry.definition.attacks.map((attack) => attack.range)));
+      if (enemyFrame.telegraph) {
+        drawAttackTelegraph(entry.telegraph, next.x, next.y, attackRadius);
+        entry.image.setTint(0xffd27a);
+      } else if (enemyFrame.attackWindowId) {
+        drawAttackActive(entry.telegraph, next.x, next.y, attackRadius);
+        entry.image.setTint(0xff7777);
+      } else {
+        clearTelegraph(entry.telegraph);
+        entry.image.clearTint();
+      }
       if (enemyFrame.attackWindowId) {
         const maxRange = Math.max(...entry.definition.attacks.map((attack) => attack.range));
         if (distance <= maxRange) this.combat.tryHit(enemyFrame.attackWindowId, this.playerRuntime.getCombatTarget());
@@ -197,18 +216,27 @@ export class HideoutScene extends Phaser.Scene {
       for (const id of attackIds) if (distance <= 105) this.combat.tryHit(id, entry.runtime.getCombatTarget());
 
       if (entry.runtime.consumeDeathEvent()) {
+        clearTelegraph(entry.telegraph);
         entry.image.setVisible(false);
         this.encounterGate?.recordEnemyDeath(entry.roomIndex);
         const activeRoomIndex = this.encounterGate?.activeRoomIndex ?? null;
         for (const candidate of this.enemies) {
           if (candidate.runtime.isDead()) continue;
           candidate.image.setVisible(activeRoomIndex === candidate.roomIndex);
+          if (activeRoomIndex !== candidate.roomIndex) clearTelegraph(candidate.telegraph);
         }
         const lootRng = createRuntimeRandom(deriveRuntimeSeed(this.lootSeedBase, `loot:${entry.runtime.snapshot.id}`));
         const drop = createEnemyDrop(entry.definition.id, getDefaultGameSession().getState().progression.level, lootRng, CONTENT);
         if (drop) {
           const pickup = this.lootRuntime.spawnDrop({ item: drop, position: { x: next.x, y: next.y } });
-          this.lootSprites.set(pickup.id, this.add.image(next.x, next.y, 'loot-placeholder').setScale(0.8));
+          const definition = CONTENT.items.get(drop.definitionId);
+          const key = definition ? itemTextureKey(definition) : 'item-generic';
+          const lootImage = this.add.image(next.x, next.y, key)
+            .setScale(1.05)
+            .setTint(getRarityColor(drop.rarity))
+            .setDepth(next.y + 2);
+          this.tweens.add({ targets: lootImage, y: next.y - 6, duration: 550, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+          this.lootSprites.set(pickup.id, lootImage);
         }
       }
     }
