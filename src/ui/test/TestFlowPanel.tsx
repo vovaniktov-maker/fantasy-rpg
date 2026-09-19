@@ -17,6 +17,7 @@ export function TestFlowPanel() {
       <strong>Test mode diagnostics</strong>
       <span>screen: <output data-testid="runtime-screen">{state.screen}</output></span>
       <span>player: <output data-testid="runtime-player-position">{Math.round(state.player.position.x)},{Math.round(state.player.position.y)}</output></span>
+      <span>hp: <output data-testid="runtime-player-hp">{Math.round(state.player.hp)}</output></span>
       <span>quest: <output data-testid="runtime-quest-status">{questStatus}</output></span>
       <span>forest clear: <output data-testid="runtime-forest-cleared">{String(state.world.forestEncounterDefeated)}</output></span>
       <span>inventory: <output data-testid="runtime-inventory-count">{inventoryCount}</output></span>
