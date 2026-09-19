@@ -12,7 +12,7 @@ export const DEFAULT_RUNTIME_TUNING: RuntimeTuning = {
 
 export const TEST_RUNTIME_TUNING: RuntimeTuning = {
   rngSeed: 424242,
-  enemyHpMultiplier: 0.2,
+  enemyHpMultiplier: 0.01,
   timingMultiplier: 0.35,
 };
 
