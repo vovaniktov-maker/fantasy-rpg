@@ -13,6 +13,7 @@ import { LootRuntime, createEnemyDrop } from '../runtime/LootRuntime.js';
 import { PlayerRuntime } from '../runtime/PlayerRuntime.js';
 import { getRuntimeTuning } from '../runtime/RuntimeTuning.js';
 import { SceneRuntimeHost } from '../runtime/SceneRuntimeHost.js';
+import { runtimeDiagnostics } from '../runtime/RuntimeDiagnostics.js';
 import { DungeonAssembler } from '../world/DungeonAssembler.js';
 
 const CONTENT = buildContentRegistry();
@@ -130,7 +131,7 @@ export class HideoutScene extends Phaser.Scene {
     this.input.on('pointerdown', onPointerDown);
     this.host.own(() => this.input.off('pointerdown', onPointerDown));
     this.host.onFrame((dtMs, controls) => this.stepRuntime(dtMs, controls));
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.host?.dispose());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { runtimeDiagnostics.setEnemies([]); this.host?.dispose(); });
   }
 
   update(_time: number, delta: number): void { this.host?.tick(delta); }
@@ -185,6 +186,11 @@ export class HideoutScene extends Phaser.Scene {
         }
       }
     }
+
+    runtimeDiagnostics.setEnemies(this.enemies
+      .map((entry) => entry.runtime.snapshot)
+      .filter((enemy) => enemy.alive)
+      .map((enemy) => ({ id: enemy.id, x: Math.round(enemy.x), y: Math.round(enemy.y), hp: enemy.hp })));
 
     if (!this.cleared && this.enemies.every((entry) => entry.runtime.isDead())) {
       this.cleared = true;
