@@ -55,6 +55,12 @@ export class HideoutScene extends Phaser.Scene {
   constructor() { super('HideoutScene'); }
 
   create(data?: { seed?: number }): void {
+    this.enemies.length = 0;
+    this.lootSprites.clear();
+    this.cleared = false;
+    this.syncElapsed = 0;
+    this.actionBuffer.clear();
+    runtimeDiagnostics.setEnemies([]);
     const session = getDefaultGameSession();
     const state = session.enterHideout();
     const tuning = getRuntimeTuning();
@@ -162,7 +168,7 @@ export class HideoutScene extends Phaser.Scene {
       const dy = player.position.y - current.y;
       const distance = Math.hypot(dx, dy);
       const enemyFrame = entry.runtime.update({
-        playerVisible: true,
+        playerVisible: distance <= Math.max(180, entry.definition.preferredRange * 1.2),
         distance,
         attackReady: true,
         hpRatio: current.hp / Math.max(1, current.maxHp),
