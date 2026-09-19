@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildContentRegistry } from '../../src/domain/content/contentRegistry';
+import type { SerializableInventoryState } from '../../src/domain/inventory/inventory';
 import { LootRuntime } from '../../src/game/runtime/LootRuntime';
 
 function dagger(id = 'drop-1') {
@@ -15,7 +16,7 @@ function dagger(id = 'drop-1') {
 describe('LootRuntime', () => {
   it('keeps the pickup alive when inventory cannot accept it', () => {
     const content = buildContentRegistry();
-    let inventory = {
+    let inventory: SerializableInventoryState = {
       capacity: 1,
       slots: [{ instanceId: 'occupied', definitionId: 'steel_dagger', quantity: 1, itemLevel: 1, rarity: 'rare' }],
     };
@@ -35,7 +36,7 @@ describe('LootRuntime', () => {
 
   it('requires manual interaction within range', () => {
     const content = buildContentRegistry();
-    let inventory = { capacity: 20, slots: Array.from({ length: 20 }, () => null) };
+    let inventory: SerializableInventoryState = { capacity: 20, slots: Array.from({ length: 20 }, () => null) };
     const runtime = new LootRuntime({
       content,
       getInventory: () => inventory,
@@ -50,7 +51,7 @@ describe('LootRuntime', () => {
 
   it('collects once when in range and removes the world pickup', () => {
     const content = buildContentRegistry();
-    let inventory = { capacity: 20, slots: Array.from({ length: 20 }, () => null) };
+    let inventory: SerializableInventoryState = { capacity: 20, slots: Array.from({ length: 20 }, () => null) };
     const runtime = new LootRuntime({
       content,
       getInventory: () => inventory,
