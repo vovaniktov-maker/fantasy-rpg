@@ -1,9 +1,6 @@
 import Phaser from 'phaser';
 
-interface ArtScene {
-  textures: Phaser.Textures.TextureManager;
-  add: Phaser.GameObjects.GameObjectFactory;
-}
+type ArtScene = any;
 
 type Draw = (graphics: Phaser.GameObjects.Graphics) => void;
 
