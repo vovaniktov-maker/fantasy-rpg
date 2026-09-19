@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": ".local-dist",
+    "rootDir": ".",
+    "noEmitOnError": true
+  },
+  "include": ["src/domain/**/*.ts", "src/game/config/gameConfig.ts", "src/game/player/**/*.ts", "src/game/combat/HitboxSystem.ts", "src/game/input/InputBindings.ts", "src/domain/dungeon/**/*.ts", "src/game/world/WorldPickup.ts", "src/ui/inventory/itemComparison.ts", "tests/local/**/*.ts", "tests/local/types.d.ts"]
+}

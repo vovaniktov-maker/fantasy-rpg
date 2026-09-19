@@ -1,0 +1,32 @@
+.ui-layer { position: fixed; inset: 0; pointer-events: none; color: #f3ead5; }
+.ui-layer button, .panel { pointer-events: auto; }
+.hud { position: absolute; left: 20px; top: 20px; width: 300px; padding: 12px; background: rgba(12, 13, 15, .78); border: 1px solid #554b3d; }
+.hud-bar { display: grid; grid-template-columns: 58px 1fr 70px; gap: 8px; align-items: center; margin: 5px 0; font-size: 12px; }
+.hud-bar-track { height: 9px; background: #222; border: 1px solid #444; }
+.hud-bar-fill { height: 100%; background: currentColor; }
+.hud-meta { margin-top: 8px; color: #c9b78f; }
+.inventory-toggle { position: absolute; right: 18px; top: 18px; background: #231f1a; color: #f3ead5; border: 1px solid #6b5b45; padding: 8px 12px; }
+.panel { position: absolute; background: rgba(16, 16, 18, .96); border: 1px solid #75634a; box-shadow: 0 12px 40px rgba(0,0,0,.6); padding: 16px; }
+.inventory-panel { inset: 80px auto auto 80px; width: 560px; }
+.inventory-panel header { display: flex; justify-content: space-between; align-items: center; }
+.inventory-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.inventory-slot { min-height: 58px; background: #201d1a; border: 1px solid #4a4035; color: #ddd0b8; display: grid; place-items: center; }
+.inventory-slot[data-empty] { opacity: .5; }
+.item-tooltip { margin-top: 14px; min-height: 80px; display: flex; flex-direction: column; gap: 4px; padding: 10px; background: #121214; border: 1px solid #393238; }
+.equipment-panel { left: 670px; top: 80px; width: 280px; }
+.equipment-row { display: flex; justify-content: space-between; border-bottom: 1px solid #2f2a25; padding: 6px 0; }
+.ui-nav { position: absolute; right: 18px; top: 18px; display: flex; gap: 8px; pointer-events: auto; }
+.ui-nav .inventory-toggle { position: static; }
+.ui-nav button { background: #231f1a; color: #f3ead5; border: 1px solid #6b5b45; padding: 8px 12px; }
+.quest-panel { right: 18px; top: 70px; width: 320px; }
+.quest-panel button, .merchant-panel button, .skill-panel button, .pause-menu button { margin: 6px 4px 0 0; }
+.merchant-panel { right: 18px; top: 220px; width: 330px; }
+.merchant-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; margin: 8px 0; }
+.skill-panel { left: 80px; top: 80px; width: min(820px, calc(100vw - 160px)); max-height: calc(100vh - 160px); overflow: auto; }
+.skill-branch { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 6px; margin-bottom: 14px; }
+.skill-branch h3 { grid-column: 1 / -1; text-transform: capitalize; }
+.pause-menu { left: 50%; top: 50%; width: 360px; transform: translate(-50%, -50%); z-index: 20; }
+.pause-menu button { display: block; width: 100%; }
+.test-flow { pointer-events: auto; position: absolute; left: 18px; bottom: 18px; max-width: 760px; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: rgba(9, 9, 12, .9); border: 1px dashed #7b6da8; }
+.test-flow strong { width: 100%; color: #bfb3e7; }
+.test-flow button { background: #282337; color: #eee8ff; border: 1px solid #65598b; padding: 5px 8px; }
