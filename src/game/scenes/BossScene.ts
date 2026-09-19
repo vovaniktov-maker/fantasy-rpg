@@ -12,6 +12,7 @@ import { LootRuntime } from '../runtime/LootRuntime.js';
 import { PlayerRuntime } from '../runtime/PlayerRuntime.js';
 import { getRuntimeTuning } from '../runtime/RuntimeTuning.js';
 import { SceneRuntimeHost } from '../runtime/SceneRuntimeHost.js';
+import { runtimeDiagnostics } from '../runtime/RuntimeDiagnostics.js';
 
 const CONTENT = buildContentRegistry();
 
@@ -58,6 +59,7 @@ export class BossScene extends Phaser.Scene {
     const state = session.enterBoss();
     const tuning = getRuntimeTuning();
     this.rng = seededRandom(tuning.rngSeed ^ state.runSeed ^ 0xb055);
+    runtimeDiagnostics.setEnemies([]);
     this.cameras.main.setBackgroundColor('#180f12');
     this.add.text(32, 24, 'Bandit Leader', { color: '#e5b0a7', fontSize: '28px' });
     this.add.text(32, 62, 'Read the telegraphs · dodge · punish recovery · E collects loot / exits after victory', { color: '#9f7773' });
