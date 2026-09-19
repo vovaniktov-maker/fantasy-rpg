@@ -111,7 +111,6 @@ export class ForestScene extends Phaser.Scene {
         hp,
         position: positions[index],
         combat: this.combat!,
-        damageMultiplier: tuning.enemyDamageMultiplier,
       });
       const image = this.add.image(positions[index].x, positions[index].y, 'bandit-placeholder').setTint(0x7a3f32);
       this.enemies.push({ runtime, image, definition });
