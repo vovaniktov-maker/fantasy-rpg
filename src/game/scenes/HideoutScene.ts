@@ -59,6 +59,7 @@ export class HideoutScene extends Phaser.Scene {
     this.syncElapsed = 0;
     this.actionBuffer.clear();
     runtimeDiagnostics.setEnemies([]);
+    runtimeDiagnostics.setHideoutCleared(false);
     const session = getDefaultGameSession();
     const state = session.enterHideout();
     const tuning = getRuntimeTuning();
@@ -249,6 +250,7 @@ export class HideoutScene extends Phaser.Scene {
 
     if (!this.cleared && this.encounterGate?.cleared) {
       this.cleared = true;
+      runtimeDiagnostics.setHideoutCleared(true);
       this.add.text(470, 100, 'Hideout route cleared — press E for the leader', { color: '#e0c99d' });
     }
 
