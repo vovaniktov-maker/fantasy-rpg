@@ -1,7 +1,14 @@
+import { useSyncExternalStore } from 'react';
+import { runtimeDiagnostics } from '../../game/runtime/RuntimeDiagnostics';
 import { useGameSnapshot } from '../useGameSnapshot';
 
 export function TestFlowPanel() {
   const state = useGameSnapshot();
+  const diagnostics = useSyncExternalStore(
+    (listener) => runtimeDiagnostics.subscribe(listener),
+    () => runtimeDiagnostics.getSnapshot(),
+    () => runtimeDiagnostics.getSnapshot(),
+  );
   const equippedCount = Object.values(state.equipment).filter(Boolean).length;
   const inventoryCount = state.inventory.slots.filter(Boolean).length;
   const questStatus = state.quests.bandit_leader_contract ?? 'available';
@@ -14,6 +21,7 @@ export function TestFlowPanel() {
       <span>forest clear: <output data-testid="runtime-forest-cleared">{String(state.world.forestEncounterDefeated)}</output></span>
       <span>inventory: <output data-testid="runtime-inventory-count">{inventoryCount}</output></span>
       <span>equipped: <output data-testid="runtime-equipped-count">{equippedCount}</output></span>
+      <output data-testid="runtime-enemies">{JSON.stringify(diagnostics.enemies)}</output>
     </section>
   );
 }
