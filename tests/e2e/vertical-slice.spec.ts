@@ -50,14 +50,23 @@ async function clickGame(page: Page, gameX: number, gameY: number): Promise<void
 async function attackRuntimeEnemy(page: Page, target: RuntimeEnemyDiagnostic): Promise<void> {
   await moveTo(page, target.x, target.y, 75);
 
-  const liveTarget = (await runtimeEnemies(page)).find((enemy) => enemy.id === target.id);
-  if (!liveTarget) return;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const liveTarget = (await runtimeEnemies(page)).find((enemy) => enemy.id === target.id);
+    if (!liveTarget) break;
 
-  const player = await playerPosition(page);
-  if (Math.hypot(liveTarget.x - player.x, liveTarget.y - player.y) > 115) return;
+    const player = await playerPosition(page);
+    if (Math.hypot(liveTarget.x - player.x, liveTarget.y - player.y) > 115) {
+      await moveTo(page, liveTarget.x, liveTarget.y, 70);
+      continue;
+    }
 
-  await clickGame(page, liveTarget.x, liveTarget.y);
-  await page.waitForTimeout(80);
+    await clickGame(page, liveTarget.x, liveTarget.y);
+    await page.waitForTimeout(180);
+
+    const afterAttack = (await runtimeEnemies(page)).find((enemy) => enemy.id === target.id);
+    if (!afterAttack || afterAttack.hp < liveTarget.hp) break;
+  }
+
   await page.keyboard.press('Space');
   await page.waitForTimeout(140);
   await page.keyboard.press('KeyE');
