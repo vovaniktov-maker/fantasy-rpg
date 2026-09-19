@@ -20,6 +20,7 @@ export function TestFlowPanel() {
       <span>hp: <output data-testid="runtime-player-hp">{Math.round(state.player.hp)}</output></span>
       <span>quest: <output data-testid="runtime-quest-status">{questStatus}</output></span>
       <span>forest clear: <output data-testid="runtime-forest-cleared">{String(state.world.forestEncounterDefeated)}</output></span>
+      <span>hideout clear: <output data-testid="runtime-hideout-cleared">{String(diagnostics.hideoutCleared)}</output></span>
       <span>inventory: <output data-testid="runtime-inventory-count">{inventoryCount}</output></span>
       <span>equipped: <output data-testid="runtime-equipped-count">{equippedCount}</output></span>
       <output data-testid="runtime-enemies">{JSON.stringify(diagnostics.enemies)}</output>
