@@ -1,4 +1,5 @@
 import { buildContentRegistry } from '../domain/content/contentRegistry.js';
+import { addSerializedItem } from '../domain/inventory/inventory.js';
 import { grantXp } from '../domain/progression/leveling.js';
 import { advanceQuest, turnInQuest, type BanditQuestStatus, type QuestState } from '../domain/quests/questState.js';
 import { LocalSaveRepository, type StorageLike } from '../domain/save/saveRepository.js';
@@ -47,22 +48,6 @@ function consumeSerializedItem(state: GameState, definitionId: string): boolean 
   const slot = state.inventory.slots[index]!;
   if (slot.quantity <= 1) state.inventory.slots[index] = null;
   else state.inventory.slots[index] = { ...slot, quantity: slot.quantity - 1 };
-  return true;
-}
-
-function addSerializedItem(state: GameState, item: SerializableItemStack): boolean {
-  const definition = CONTENT.items.get(item.definitionId);
-  if (!definition) return false;
-  if (definition.stackable) {
-    const stack = state.inventory.slots.find((slot) => slot?.definitionId === item.definitionId && slot.quantity < definition.maxStack);
-    if (stack && stack.quantity + item.quantity <= definition.maxStack) {
-      stack.quantity += item.quantity;
-      return true;
-    }
-  }
-  const empty = state.inventory.slots.findIndex((slot) => slot === null);
-  if (empty < 0) return false;
-  state.inventory.slots[empty] = structuredClone(item);
   return true;
 }
 
@@ -191,7 +176,9 @@ export class GameSession {
       itemLevel: next.progression.level,
       rarity: definition.uniqueEffect ? 'unique' : rarity,
     };
-    if (!addSerializedItem(next, item)) return false;
+    const added = addSerializedItem(next.inventory, item, CONTENT.items);
+    if (!added.added) return false;
+    next.inventory = added.state;
     this.state = next;
     this.publish();
     return true;
@@ -245,7 +232,9 @@ export class GameSession {
     const next = cloneState(this.state);
     for (const rewardItemId of definition.rewardItemIds) {
       const reward: SerializableItemStack = { instanceId: `quest-${rewardItemId}-${this.now()}`, definitionId: rewardItemId, quantity: 1, itemLevel: next.progression.level, rarity: 'rare' };
-      if (!addSerializedItem(next, reward)) return;
+      const added = addSerializedItem(next.inventory, reward, CONTENT.items);
+      if (!added.added) return;
+      next.inventory = added.state;
     }
     next.economy.gold += definition.rewardGold;
     next.progression = grantXp(next.progression, definition.rewardXp);
@@ -284,7 +273,9 @@ export class GameSession {
     if (price === undefined || this.state.economy.gold < price || !CONTENT.items.has(definitionId)) return;
     const next = cloneState(this.state);
     const item: SerializableItemStack = { instanceId: `merchant-${definitionId}-${this.now()}`, definitionId, quantity: 1, itemLevel: next.progression.level, rarity: 'common' };
-    if (!addSerializedItem(next, item)) return;
+    const added = addSerializedItem(next.inventory, item, CONTENT.items);
+    if (!added.added) return;
+    next.inventory = added.state;
     next.economy.gold -= price;
     this.state = next;
     this.publish();
@@ -331,7 +322,11 @@ let defaultSession: GameSession | null = null;
 export function getDefaultGameSession(): GameSession {
   if (defaultSession) return defaultSession;
   const storage: StorageLike = typeof window !== 'undefined' && window.localStorage ? window.localStorage : new MemoryStorage();
-  const repository = new LocalSaveRepository(storage, createInitialGameState, new Set(CONTENT.items.keys()));
+  const repository = new LocalSaveRepository(storage, createInitialGameState, {
+    itemIds: new Set(CONTENT.items.keys()),
+    skillNodes: CONTENT.skills,
+    items: CONTENT.items,
+  });
   defaultSession = new GameSession(repository, gameBridge);
   defaultSession.load();
   return defaultSession;

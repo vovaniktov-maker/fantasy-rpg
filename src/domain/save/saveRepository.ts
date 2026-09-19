@@ -1,5 +1,5 @@
 import type { GameState } from '../state/GameState.js';
-import { deserializeGameState, serializeGameState } from './saveSchema.js';
+import { deserializeGameState, serializeGameState, type SaveContentIndex } from './saveSchema.js';
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -20,14 +20,14 @@ export class LocalSaveRepository {
   constructor(
     private readonly storage: StorageLike,
     private readonly freshState: () => GameState,
-    private readonly knownItemIds: ReadonlySet<string>,
+    private readonly content: SaveContentIndex | ReadonlySet<string>,
   ) {}
 
   save(state: GameState): void {
     const current = this.storage.getItem(LocalSaveRepository.PRIMARY_KEY);
     if (current) {
       try {
-        deserializeGameState(current, this.knownItemIds);
+        deserializeGameState(current, this.content);
         this.storage.setItem(LocalSaveRepository.BACKUP_KEY, current);
       } catch {
         // Invalid primary is never promoted to backup.
@@ -40,7 +40,7 @@ export class LocalSaveRepository {
     const primary = this.storage.getItem(LocalSaveRepository.PRIMARY_KEY);
     if (primary) {
       try {
-        return { state: deserializeGameState(primary, this.knownItemIds).state, source: 'primary', recovered: false };
+        return { state: deserializeGameState(primary, this.content).state, source: 'primary', recovered: false };
       } catch {
         // fall through to backup
       }
@@ -48,7 +48,7 @@ export class LocalSaveRepository {
     const backup = this.storage.getItem(LocalSaveRepository.BACKUP_KEY);
     if (backup) {
       try {
-        return { state: deserializeGameState(backup, this.knownItemIds).state, source: 'backup', recovered: true };
+        return { state: deserializeGameState(backup, this.content).state, source: 'backup', recovered: true };
       } catch {
         // fall through to a fresh state
       }

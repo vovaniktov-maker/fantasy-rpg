@@ -1,3 +1,5 @@
+import type { ItemDefinition } from '../items/itemTypes.js';
+import type { SkillNodeDefinition } from '../skills/skillTree.js';
 import { createInitialGameState, type GameState } from '../state/GameState.js';
 
 export const CURRENT_SAVE_VERSION = 2;
@@ -13,6 +15,14 @@ export interface DeserializeResult {
   state: GameState;
   migrated: boolean;
 }
+
+export interface SaveContentIndex {
+  itemIds: ReadonlySet<string>;
+  skillNodes: ReadonlyMap<string, SkillNodeDefinition>;
+  items?: ReadonlyMap<string, ItemDefinition>;
+}
+
+type SaveContentInput = SaveContentIndex | ReadonlySet<string>;
 
 export function serializeGameState(state: GameState, writtenAt = new Date().toISOString()): string {
   const envelope: SaveEnvelope<GameState> = {
@@ -51,17 +61,65 @@ export function migrateSave(envelope: SaveEnvelope<unknown>): SaveEnvelope<GameS
   return { version: CURRENT_SAVE_VERSION, writtenAt: String(envelope.writtenAt || new Date(0).toISOString()), payload: state };
 }
 
-function sanitizeUnknownContent(state: GameState, knownItemIds: ReadonlySet<string>): GameState {
-  if (knownItemIds.size === 0) return state;
+function normalizeContent(content: SaveContentInput): SaveContentIndex {
+  if (content instanceof Set) {
+    return { itemIds: content, skillNodes: new Map() };
+  }
+  return content;
+}
+
+export function sanitizeGameState(state: GameState, input: SaveContentInput): GameState {
+  const content = normalizeContent(input);
   const next = structuredClone(state);
-  next.inventory.slots = next.inventory.slots.map((slot) => slot && knownItemIds.has(slot.definitionId) ? slot : null);
-  // GameState equipment currently stores equipped instance IDs rather than inventory slots.
-  // Equipped instances are intentionally separate from inventory, so inventory membership
-  // cannot be used to decide whether an equipment reference is valid.
+
+  if (content.itemIds.size > 0) {
+    next.inventory.slots = next.inventory.slots.map((slot) =>
+      slot && content.itemIds.has(slot.definitionId) ? slot : null,
+    );
+  }
+
+  if (content.skillNodes.size > 0) {
+    const learned: Record<string, number> = {};
+    for (const [skillId, rawRank] of Object.entries(next.skills.learned)) {
+      const definition = content.skillNodes.get(skillId);
+      if (!definition) continue;
+      const rank = Math.max(0, Math.min(definition.maxRank, Math.floor(rawRank)));
+      if (rank > 0) learned[skillId] = rank;
+    }
+    next.skills.learned = learned;
+
+    const learnedActiveIds = new Set<string>();
+    for (const [nodeId, rank] of Object.entries(learned)) {
+      if (rank <= 0) continue;
+      const definition = content.skillNodes.get(nodeId);
+      if (definition?.kind === 'active' && definition.activeSkillId) learnedActiveIds.add(definition.activeSkillId);
+    }
+    next.skills.equippedActiveSkillIds = next.skills.equippedActiveSkillIds
+      .slice(0, 4)
+      .map((skillId) => skillId && learnedActiveIds.has(skillId) ? skillId : null);
+    while (next.skills.equippedActiveSkillIds.length < 4) next.skills.equippedActiveSkillIds.push(null);
+  }
+
+  const inventoryByInstance = new Map(
+    next.inventory.slots
+      .filter((slot): slot is NonNullable<typeof slot> => slot !== null)
+      .map((slot) => [slot.instanceId, slot]),
+  );
+  for (const [slotName, instanceId] of Object.entries(next.equipment)) {
+    if (!instanceId) continue;
+    const item = inventoryByInstance.get(instanceId);
+    if (!item) {
+      next.equipment[slotName] = null;
+      continue;
+    }
+    const definition = content.items?.get(item.definitionId);
+    if (definition && definition.equipSlot !== slotName) next.equipment[slotName] = null;
+  }
+
   return next;
 }
 
-export function deserializeGameState(serialized: string, knownItemIds: ReadonlySet<string>): DeserializeResult {
+export function deserializeGameState(serialized: string, content: SaveContentInput): DeserializeResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(serialized);
@@ -75,6 +133,6 @@ export function deserializeGameState(serialized: string, knownItemIds: ReadonlyS
   return {
     version: migrated.version,
     migrated: raw.version !== CURRENT_SAVE_VERSION,
-    state: sanitizeUnknownContent(migrated.payload, knownItemIds),
+    state: sanitizeGameState(migrated.payload, content),
   };
 }
