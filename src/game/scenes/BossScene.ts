@@ -121,7 +121,10 @@ export class BossScene extends Phaser.Scene {
     this.input.on('pointerdown', onPointerDown);
     this.host.own(() => this.input.off('pointerdown', onPointerDown));
     this.host.onFrame((dtMs, controls) => this.stepRuntime(dtMs, controls));
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.host?.dispose());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      runtimeDiagnostics.setEnemies([]);
+      this.host?.dispose();
+    });
   }
 
   update(_time: number, delta: number): void { this.host?.tick(delta); }
@@ -185,8 +188,17 @@ export class BossScene extends Phaser.Scene {
       this.combat.tryHit(bossFrame.attackWindowId, this.playerRuntime.getCombatTarget());
     }
 
+    const liveBoss = this.bossRuntime.snapshot;
+    runtimeDiagnostics.setEnemies(liveBoss.hp > 0 ? [{
+      id: liveBoss.id,
+      x: Math.round(this.bossSprite.x),
+      y: Math.round(this.bossSprite.y),
+      hp: liveBoss.hp,
+    }] : []);
+
     if (!this.victoryResolved && this.bossRuntime.consumeVictory().resolved) {
       this.victoryResolved = true;
+      runtimeDiagnostics.setEnemies([]);
       const session = getDefaultGameSession();
       session.markBanditLeaderDefeated();
       this.bossSprite.setAlpha(0.35).setTint(0x6c6c6c);
