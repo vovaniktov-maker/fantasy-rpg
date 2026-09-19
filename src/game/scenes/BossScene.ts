@@ -55,6 +55,11 @@ export class BossScene extends Phaser.Scene {
   constructor() { super('BossScene'); }
 
   create(): void {
+    this.lootSprites.clear();
+    this.victoryResolved = false;
+    this.syncElapsed = 0;
+    this.actionBuffer.clear();
+    runtimeDiagnostics.setEnemies([]);
     const session = getDefaultGameSession();
     const state = session.enterBoss();
     const tuning = getRuntimeTuning();
