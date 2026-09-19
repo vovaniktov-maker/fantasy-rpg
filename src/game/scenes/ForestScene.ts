@@ -12,6 +12,7 @@ import { PlayerRuntime } from '../runtime/PlayerRuntime.js';
 import { getRuntimeTuning } from '../runtime/RuntimeTuning.js';
 import { SceneRuntimeHost } from '../runtime/SceneRuntimeHost.js';
 import { runtimeDiagnostics } from '../runtime/RuntimeDiagnostics.js';
+import { createRuntimeRandom, deriveRuntimeSeed } from '../runtime/RuntimeRandom.js';
 
 const CONTENT = buildContentRegistry();
 
@@ -35,15 +36,6 @@ function hpFor(definition: EnemyDefinition): number {
   }
 }
 
-function seededRandom(seed: number) {
-  let state = seed >>> 0 || 1;
-  const next = () => {
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-  return { next, pick: <T>(items: readonly T[]) => items[Math.min(items.length - 1, Math.floor(next() * items.length))] };
-}
-
 export class ForestScene extends Phaser.Scene {
   private host?: SceneRuntimeHost;
   private playerRuntime?: PlayerRuntime;
@@ -62,7 +54,8 @@ export class ForestScene extends Phaser.Scene {
   private readonly actionBuffer = new GameplayActionBuffer();
   private syncElapsed = 0;
   private encounterResolved = false;
-  private rng = seededRandom(1);
+  private combatRng = createRuntimeRandom(1);
+  private lootSeedBase = 1;
 
   constructor() { super('ForestScene'); }
 
@@ -76,12 +69,14 @@ export class ForestScene extends Phaser.Scene {
     const session = getDefaultGameSession();
     const state = session.enterForest();
     const tuning = getRuntimeTuning();
-    this.rng = seededRandom(tuning.rngSeed ^ state.runSeed);
+    const runtimeSeed = tuning.rngSeed ^ state.runSeed;
+    this.combatRng = createRuntimeRandom(deriveRuntimeSeed(runtimeSeed, 'combat:forest'));
+    this.lootSeedBase = runtimeSeed;
     this.cameras.main.setBackgroundColor('#0c1710');
     this.add.text(32, 24, 'Cursed Forest', { color: '#b8d0a8', fontSize: '24px' });
     this.add.text(32, 64, 'Defeat the patrol · E picks up loot · E enters the hideout after the patrol falls', { color: '#71836b' });
 
-    this.combat = new CombatRuntime(() => this.rng.next());
+    this.combat = new CombatRuntime(() => this.combatRng.next());
     const stats = deriveCombatStats(state, CONTENT);
     this.playerRuntime = new PlayerRuntime({
       id: 'player',
@@ -196,7 +191,8 @@ export class ForestScene extends Phaser.Scene {
 
       if (entry.runtime.consumeDeathEvent()) {
         entry.image.setVisible(false);
-        const drop = createEnemyDrop(entry.definition.id, getDefaultGameSession().getState().progression.level, this.rng, CONTENT);
+        const lootRng = createRuntimeRandom(deriveRuntimeSeed(this.lootSeedBase, `loot:${entry.runtime.snapshot.id}`));
+        const drop = createEnemyDrop(entry.definition.id, getDefaultGameSession().getState().progression.level, lootRng, CONTENT);
         if (drop) {
           const pickup = this.lootRuntime.spawnDrop({ item: drop, position: { x: next.x, y: next.y } });
           this.lootSprites.set(pickup.id, this.add.image(next.x, next.y, 'loot-placeholder').setScale(0.8));
