@@ -7,12 +7,16 @@ export interface RuntimeEnemyDiagnostic {
 
 export interface RuntimeDiagnosticsSnapshot {
   enemies: readonly RuntimeEnemyDiagnostic[];
+  hideoutCleared: boolean;
 }
 
 type Listener = () => void;
 
 export class RuntimeDiagnostics {
-  private snapshot: RuntimeDiagnosticsSnapshot = Object.freeze({ enemies: Object.freeze([]) });
+  private snapshot: RuntimeDiagnosticsSnapshot = Object.freeze({
+    enemies: Object.freeze([]),
+    hideoutCleared: false,
+  });
   private readonly listeners = new Set<Listener>();
 
   subscribe(listener: Listener): () => void {
@@ -25,16 +29,30 @@ export class RuntimeDiagnostics {
   }
 
   setEnemies(enemies: readonly RuntimeEnemyDiagnostic[]): void {
-    const next = Object.freeze({
-      enemies: Object.freeze(enemies.map((enemy) => Object.freeze({ ...enemy }))),
-    });
-    const same = this.snapshot.enemies.length === next.enemies.length
+    const frozenEnemies = Object.freeze(enemies.map((enemy) => Object.freeze({ ...enemy })));
+    const same = this.snapshot.enemies.length === frozenEnemies.length
       && this.snapshot.enemies.every((enemy, index) => {
-        const candidate = next.enemies[index];
+        const candidate = frozenEnemies[index];
         return candidate && enemy.id === candidate.id && enemy.x === candidate.x && enemy.y === candidate.y && enemy.hp === candidate.hp;
       });
     if (same) return;
-    this.snapshot = next;
+    this.snapshot = Object.freeze({
+      ...this.snapshot,
+      enemies: frozenEnemies,
+    });
+    this.notify();
+  }
+
+  setHideoutCleared(hideoutCleared: boolean): void {
+    if (this.snapshot.hideoutCleared === hideoutCleared) return;
+    this.snapshot = Object.freeze({
+      ...this.snapshot,
+      hideoutCleared,
+    });
+    this.notify();
+  }
+
+  private notify(): void {
     for (const listener of this.listeners) listener();
   }
 }
