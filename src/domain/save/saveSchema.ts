@@ -55,10 +55,9 @@ function sanitizeUnknownContent(state: GameState, knownItemIds: ReadonlySet<stri
   if (knownItemIds.size === 0) return state;
   const next = structuredClone(state);
   next.inventory.slots = next.inventory.slots.map((slot) => slot && knownItemIds.has(slot.definitionId) ? slot : null);
-  const validInstances = new Set(next.inventory.slots.filter(Boolean).map((slot) => slot!.instanceId));
-  for (const [slot, instanceId] of Object.entries(next.equipment)) {
-    if (instanceId && !validInstances.has(instanceId)) next.equipment[slot] = null;
-  }
+  // GameState equipment currently stores equipped instance IDs rather than inventory slots.
+  // Equipped instances are intentionally separate from inventory, so inventory membership
+  // cannot be used to decide whether an equipment reference is valid.
   return next;
 }
 
