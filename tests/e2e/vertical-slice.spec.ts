@@ -47,15 +47,21 @@ async function clickGame(page: Page, gameX: number, gameY: number): Promise<void
   );
 }
 
-async function attackNear(page: Page, x: number, y: number, attacks = 1): Promise<void> {
-  await moveTo(page, x, y);
+async function attackRuntimeEnemy(page: Page, target: RuntimeEnemyDiagnostic): Promise<void> {
+  await moveTo(page, target.x, target.y, 75);
+
+  const liveTarget = (await runtimeEnemies(page)).find((enemy) => enemy.id === target.id);
+  if (!liveTarget) return;
+
+  const player = await playerPosition(page);
+  if (Math.hypot(liveTarget.x - player.x, liveTarget.y - player.y) > 115) return;
+
+  await clickGame(page, liveTarget.x, liveTarget.y);
+  await page.waitForTimeout(80);
   await page.keyboard.press('Space');
-  for (let index = 0; index < attacks; index += 1) {
-    await clickGame(page, x, y);
-    await page.waitForTimeout(220);
-  }
+  await page.waitForTimeout(140);
   await page.keyboard.press('KeyE');
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(100);
 }
 
 async function waitForScreen(page: Page, screen: string): Promise<void> {
@@ -92,7 +98,7 @@ async function clearRuntimeEnemies(page: Page, maxEngagements = 24): Promise<voi
       Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y)
     );
     const target = enemies[0];
-    await attackNear(page, target.x, target.y, 1);
+    await attackRuntimeEnemy(page, target);
   }
   expect(await runtimeEnemies(page)).toHaveLength(0);
 }
@@ -122,9 +128,10 @@ async function defeatRuntimeBoss(page: Page, maxEngagements = 20): Promise<{ x: 
     const player = await playerPosition(page);
     if (Math.hypot(movedBoss.x - player.x, movedBoss.y - player.y) > 115) continue;
 
-    await page.keyboard.press('Space');
     await clickGame(page, movedBoss.x, movedBoss.y);
-    await page.waitForTimeout(220);
+    await page.waitForTimeout(80);
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(140);
   }
 
   await expect(page.getByTestId('runtime-quest-status')).toHaveText('leaderDefeated');
