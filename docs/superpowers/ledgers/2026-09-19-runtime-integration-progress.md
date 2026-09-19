@@ -18,3 +18,5 @@ Task 1: Ruling: death/checkpoint fixture must contain the equipped dagger instan
 Task 1: complete (commits 4a7d2dc..edc7d71, tests: GitHub Actions CI run 35455883642 -> success; typecheck, unit tests, build, e2e all green)
 
 Task 2: complete (commits 4f027a1..6580b22, tests: GitHub Actions CI run 35456067212 -> success; typecheck, unit tests, build, e2e all green)
+
+Task 3: complete (commits d70d2f2..c1a2c12, tests: GitHub Actions CI run 35456232590 -> success; typecheck, unit tests, build, e2e all green)
