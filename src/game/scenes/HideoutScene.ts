@@ -14,6 +14,7 @@ import { PlayerRuntime } from '../runtime/PlayerRuntime.js';
 import { getRuntimeTuning } from '../runtime/RuntimeTuning.js';
 import { SceneRuntimeHost } from '../runtime/SceneRuntimeHost.js';
 import { runtimeDiagnostics } from '../runtime/RuntimeDiagnostics.js';
+import { createRuntimeRandom, deriveRuntimeSeed } from '../runtime/RuntimeRandom.js';
 import { DungeonAssembler } from '../world/DungeonAssembler.js';
 
 const CONTENT = buildContentRegistry();
@@ -26,15 +27,6 @@ function learnedActiveIds(learned: Record<string, number>): Set<string> {
     if (node?.kind === 'active' && node.activeSkillId) result.add(node.activeSkillId);
   }
   return result;
-}
-
-function seededRandom(seed: number) {
-  let state = seed >>> 0 || 1;
-  const next = () => {
-    state = (Math.imul(state, 1103515245) + 12345) >>> 0;
-    return state / 4294967296;
-  };
-  return { next, pick: <T>(items: readonly T[]) => items[Math.min(items.length - 1, Math.floor(next() * items.length))] };
 }
 
 export class HideoutScene extends Phaser.Scene {
@@ -50,7 +42,8 @@ export class HideoutScene extends Phaser.Scene {
   private readonly actionBuffer = new GameplayActionBuffer();
   private syncElapsed = 0;
   private cleared = false;
-  private rng = seededRandom(1);
+  private combatRng = createRuntimeRandom(1);
+  private lootSeedBase = 1;
 
   constructor() { super('HideoutScene'); }
 
@@ -64,7 +57,9 @@ export class HideoutScene extends Phaser.Scene {
     const session = getDefaultGameSession();
     const state = session.enterHideout();
     const tuning = getRuntimeTuning();
-    this.rng = seededRandom(tuning.rngSeed ^ state.runSeed);
+    const runtimeSeed = tuning.rngSeed ^ state.runSeed;
+    this.combatRng = createRuntimeRandom(deriveRuntimeSeed(runtimeSeed, 'combat:hideout'));
+    this.lootSeedBase = runtimeSeed;
     const generated = generateDungeon(data?.seed ?? state.runSeed, dungeonRoomDefinitions);
     if (!generated.ok) throw new Error(generated.error.message);
     const rooms = new DungeonAssembler(dungeonRoomDefinitions).assemble(generated.dungeon);
@@ -73,7 +68,7 @@ export class HideoutScene extends Phaser.Scene {
     this.add.text(32, 24, 'Bandit Hideout', { color: '#d5c0a0', fontSize: '24px' });
     this.add.text(32, 58, `Run seed ${state.runSeed} · clear the route · E opens the boss door`, { color: '#9b8a74' });
 
-    this.combat = new CombatRuntime(() => this.rng.next());
+    this.combat = new CombatRuntime(() => this.combatRng.next());
     const stats = deriveCombatStats(state, CONTENT);
     this.playerRuntime = new PlayerRuntime({
       id: 'player',
@@ -185,7 +180,8 @@ export class HideoutScene extends Phaser.Scene {
 
       if (entry.runtime.consumeDeathEvent()) {
         entry.image.setVisible(false);
-        const drop = createEnemyDrop(entry.definition.id, getDefaultGameSession().getState().progression.level, this.rng, CONTENT);
+        const lootRng = createRuntimeRandom(deriveRuntimeSeed(this.lootSeedBase, `loot:${entry.runtime.snapshot.id}`));
+        const drop = createEnemyDrop(entry.definition.id, getDefaultGameSession().getState().progression.level, lootRng, CONTENT);
         if (drop) {
           const pickup = this.lootRuntime.spawnDrop({ item: drop, position: { x: next.x, y: next.y } });
           this.lootSprites.set(pickup.id, this.add.image(next.x, next.y, 'loot-placeholder').setScale(0.8));
