@@ -11,6 +11,7 @@ import { PauseMenu } from '../ui/menus/PauseMenu';
 import { TestFlowPanel } from '../ui/test/TestFlowPanel';
 import { useGameSnapshot } from '../ui/useGameSnapshot';
 import { useGameplayControls } from '../ui/useGameplayControls';
+import { gameBridge } from '../game/bridge/GameBridge';
 import '../styles/game-ui.css';
 
 const merchantOffers = [
@@ -53,11 +54,12 @@ export default function App() {
           <button onClick={() => setSkillsOpen((open) => !open)}>Skills [K]</button>
           <button onClick={() => setQuestOpen((open) => !open)}>Quest [J]</button>
           {state.screen === 'outpost' && <button onClick={() => setMerchantOpen((open) => !open)}>Merchant</button>}
+          {state.screen === 'outpost' && <button onClick={() => gameBridge.dispatch({ type: 'SAVE_GAME' })}>Save game</button>}
         </nav>
         <InventoryPanel open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
         <EquipmentPanel open={inventoryOpen} />
         <SkillTreePanel open={skillsOpen} />
-        <QuestPanel open={questOpen || testMode} />
+        <QuestPanel open={questOpen} />
         <MerchantPanel open={merchantOpen} offers={merchantOffers} />
         <PauseMenu open={paused} onResume={() => setPaused(false)} />
         {testMode && <TestFlowPanel />}
