@@ -114,6 +114,12 @@ async function defeatRuntimeBoss(page: Page, maxEngagements = 20): Promise<{ x: 
   for (let engagement = 0; engagement < maxEngagements; engagement += 1) {
     if (await runtimeQuestStatus(page) === 'leaderDefeated') return lastKnown;
 
+    const screen = await runtimeScreen(page);
+    const hp = (await page.getByTestId('runtime-player-hp').textContent())?.trim() ?? '?';
+    if (screen !== 'boss') {
+      throw new Error(`Boss fight left scene: screen=${screen}, playerHp=${hp}, lastBoss=${JSON.stringify(lastKnown)}`);
+    }
+
     const boss = (await runtimeEnemies(page)).find((enemy) => enemy.id === 'bandit_leader');
     if (!boss) {
       await page.waitForTimeout(100);
@@ -134,8 +140,10 @@ async function defeatRuntimeBoss(page: Page, maxEngagements = 20): Promise<{ x: 
     await page.waitForTimeout(140);
   }
 
-  await expect(page.getByTestId('runtime-quest-status')).toHaveText('leaderDefeated');
-  return lastKnown;
+  const hp = (await page.getByTestId('runtime-player-hp').textContent())?.trim() ?? '?';
+  const player = await playerPosition(page);
+  const enemies = await runtimeEnemies(page);
+  throw new Error(`Boss not defeated after ${maxEngagements} engagements: playerHp=${hp}, player=${JSON.stringify(player)}, enemies=${JSON.stringify(enemies)}, lastBoss=${JSON.stringify(lastKnown)}`);
 }
 
 async function equipFirstGear(page: Page): Promise<void> {
