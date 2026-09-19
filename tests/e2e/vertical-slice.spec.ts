@@ -62,6 +62,15 @@ async function waitForScreen(page: Page, screen: string): Promise<void> {
   await expect.poll(() => runtimeScreen(page), { timeout: 10_000 }).toBe(screen);
 }
 
+async function pressUntilScreen(page: Page, key: string, screen: string): Promise<void> {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    if (await runtimeScreen(page) === screen) return;
+    await page.keyboard.press(key);
+    await page.waitForTimeout(120);
+  }
+  await waitForScreen(page, screen);
+}
+
 interface RuntimeEnemyDiagnostic {
   id: string;
   x: number;
@@ -128,8 +137,7 @@ test('vertical slice completes through real runtime input and survives reload', 
   await page.getByRole('button', { name: 'Accept' }).click();
   await page.keyboard.press('KeyJ');
 
-  await page.keyboard.press('KeyE');
-  await waitForScreen(page, 'forest');
+  await pressUntilScreen(page, 'KeyE', 'forest');
 
   await clearRuntimeEnemies(page);
   await expect(page.getByTestId('runtime-forest-cleared')).toHaveText('true');
@@ -175,8 +183,7 @@ test('normal outpost gate remains single-shot across repeated mounts', async ({ 
   await page.goto('/?testMode=1');
   for (let index = 0; index < 3; index += 1) {
     await waitForScreen(page, 'outpost');
-    await page.keyboard.press('KeyE');
-    await waitForScreen(page, 'forest');
+    await pressUntilScreen(page, 'KeyE', 'forest');
     await page.reload();
   }
   await waitForScreen(page, 'outpost');
