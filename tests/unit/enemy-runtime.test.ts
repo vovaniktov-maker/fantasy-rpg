@@ -61,7 +61,7 @@ describe('EnemyRuntime', () => {
     const combat = new CombatRuntime(() => 0.5);
     const enemy = new EnemyRuntime({
       id: 'enemy-scaled',
-      definition: melee,
+      definition: enemyDefinitions.find((enemy) => enemy.id === 'bandit_melee')!,
       hp: 100,
       position: { x: 0, y: 0 },
       combat,
