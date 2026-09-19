@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildContentRegistry } from '../../src/domain/content/contentRegistry';
 import { createInitialGameState } from '../../src/domain/state/GameState';
-import { deriveCombatStats } from '../../src/domain/stats/DerivedStatsService';
+import { deriveCombatStats, ROGUE_BASE_STATS } from '../../src/domain/stats/DerivedStatsService';
 
 describe('derived combat stats', () => {
   it('combines equipped item and learned passive modifiers', () => {
@@ -25,5 +25,16 @@ describe('derived combat stats', () => {
     const state = createInitialGameState();
     state.equipment.weapon = 'missing';
     expect(() => deriveCombatStats(state, buildContentRegistry())).not.toThrow();
+  });
+  it('stale equipment and unknown skills never contribute derived stats', () => {
+    const state = createInitialGameState();
+    state.equipment.weapon = 'gone';
+    state.skills.learned.removed_skill = 99;
+
+    const stats = deriveCombatStats(state, buildContentRegistry());
+
+    expect(stats.attackPower).toBe(ROGUE_BASE_STATS.attackPower);
+    expect(stats.critChance).toBe(ROGUE_BASE_STATS.critChance);
+    expect(stats.armor).toBe(ROGUE_BASE_STATS.armor);
   });
 });
