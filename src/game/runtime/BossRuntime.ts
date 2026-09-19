@@ -21,12 +21,14 @@ export interface BossRuntimeConfig {
 
 export interface BossRuntimeObservation {
   distance: number;
+  directionToPlayer?: { x: number; y: number };
 }
 
 export interface BossRuntimeFrame {
   phase: BossPhase;
   telegraph?: { moveId: string; telegraphMs: number; cueKey: string };
   attackWindowId?: string;
+  movement?: { x: number; y: number };
   recovering: boolean;
 }
 
@@ -36,6 +38,42 @@ export interface BossRuntimeSnapshot {
   maxHp: number;
   armor: number;
   phase: BossPhase;
+}
+
+function normalizedDirection(direction?: { x: number; y: number }): { x: number; y: number } {
+  const source = direction ?? { x: -1, y: 0 };
+  const length = Math.hypot(source.x, source.y);
+  if (length <= 0.0001) return { x: -1, y: 0 };
+  return { x: source.x / length, y: source.y / length };
+}
+
+function movementForMove(
+  moveId: string,
+  directionToPlayer: { x: number; y: number } | undefined,
+  sequence: number,
+): { x: number; y: number } | undefined {
+  const toward = normalizedDirection(directionToPlayer);
+  const side = { x: -toward.y, y: toward.x };
+  const sign = sequence % 2 === 0 ? 1 : -1;
+
+  switch (moveId) {
+    case 'smoke_reposition':
+      return {
+        x: side.x * 150 * sign - toward.x * 70,
+        y: side.y * 150 * sign - toward.y * 70,
+      };
+    case 'side_dodge':
+      return { x: side.x * 120 * sign, y: side.y * 120 * sign };
+    case 'dash_behind':
+      return { x: toward.x * 230, y: toward.y * 230 };
+    case 'smoke_dash_chain':
+      return {
+        x: toward.x * 170 + side.x * 90 * sign,
+        y: toward.y * 170 + side.y * 90 * sign,
+      };
+    default:
+      return undefined;
+  }
 }
 
 type ActionState =
@@ -125,7 +163,12 @@ export class BossRuntime {
         remainingMs: move.activeMs * this.timingMultiplier,
         attackWindowId,
       };
-      return { phase, attackWindowId, recovering: false };
+      return {
+        phase,
+        attackWindowId,
+        movement: movementForMove(move.id, observation.directionToPlayer, this.brain.sequence),
+        recovering: false,
+      };
     }
 
     if (this.action.mode === 'active') {
