@@ -85,6 +85,15 @@ export class PlayerRuntime {
     this.controls = { ...snapshot };
   }
 
+  syncResources(resources: { hp?: number; energy?: number }): void {
+    if (resources.hp !== undefined) {
+      this.hp = Math.max(0, Math.min(this.stats.hp, resources.hp));
+    }
+    if (resources.energy !== undefined) {
+      this.combatController.syncEnergy(resources.energy);
+    }
+  }
+
   applyDerivedStats(stats: CoreStats): void {
     const energy = this.combatController.getSnapshot().energy;
     this.stats = { ...stats };
