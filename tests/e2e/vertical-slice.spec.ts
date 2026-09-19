@@ -97,6 +97,40 @@ async function clearRuntimeEnemies(page: Page, maxEngagements = 24): Promise<voi
   expect(await runtimeEnemies(page)).toHaveLength(0);
 }
 
+
+async function runtimeQuestStatus(page: Page): Promise<string> {
+  return (await page.getByTestId('runtime-quest-status').textContent())?.trim() ?? '';
+}
+
+async function defeatRuntimeBoss(page: Page, maxEngagements = 20): Promise<{ x: number; y: number }> {
+  let lastKnown = { x: 720, y: 360 };
+
+  for (let engagement = 0; engagement < maxEngagements; engagement += 1) {
+    if (await runtimeQuestStatus(page) === 'leaderDefeated') return lastKnown;
+
+    const boss = (await runtimeEnemies(page)).find((enemy) => enemy.id === 'bandit_leader');
+    if (!boss) {
+      await page.waitForTimeout(100);
+      continue;
+    }
+
+    lastKnown = { x: boss.x, y: boss.y };
+    await moveTo(page, boss.x, boss.y, 80);
+
+    const movedBoss = (await runtimeEnemies(page)).find((enemy) => enemy.id === 'bandit_leader') ?? boss;
+    lastKnown = { x: movedBoss.x, y: movedBoss.y };
+    const player = await playerPosition(page);
+    if (Math.hypot(movedBoss.x - player.x, movedBoss.y - player.y) > 115) continue;
+
+    await page.keyboard.press('Space');
+    await clickGame(page, movedBoss.x, movedBoss.y);
+    await page.waitForTimeout(360);
+  }
+
+  await expect(page.getByTestId('runtime-quest-status')).toHaveText('leaderDefeated');
+  return lastKnown;
+}
+
 async function equipFirstGear(page: Page): Promise<void> {
   await page.getByRole('button', { name: /Inventory/ }).click();
   const gearIds = [
@@ -153,15 +187,10 @@ test('vertical slice completes through real runtime input and survives reload', 
   await clearRuntimeEnemies(page, 40);
   await pressUntilScreen(page, 'KeyE', 'boss');
 
-  await moveTo(page, 650, 360, 45);
-  await page.keyboard.press('Space');
-  for (let index = 0; index < 5; index += 1) {
-    await clickGame(page, 720, 360);
-    await page.waitForTimeout(360);
-  }
+  const bossDropPosition = await defeatRuntimeBoss(page);
   await expect(page.getByTestId('runtime-quest-status')).toHaveText('leaderDefeated');
 
-  await moveTo(page, 720, 360, 35);
+  await moveTo(page, bossDropPosition.x, bossDropPosition.y, 45);
   for (let i = 0; i < 4 && await runtimeScreen(page) === 'boss'; i += 1) {
     await page.keyboard.press('KeyE');
     await page.waitForTimeout(150);
