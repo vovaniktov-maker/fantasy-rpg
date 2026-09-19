@@ -228,7 +228,7 @@ export class ForestScene extends Phaser.Scene {
           const key = definition ? itemTextureKey(definition) : 'item-generic';
           const lootImage = this.add.image(next.x, next.y, key)
             .setScale(1.05)
-            .setTint(getRarityColor(drop.rarity))
+            .setTint(getRarityColor(drop.rarity ?? 'common'))
             .setDepth(next.y + 2);
           this.tweens.add({ targets: lootImage, y: next.y - 6, duration: 550, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
           this.lootSprites.set(pickup.id, lootImage);
