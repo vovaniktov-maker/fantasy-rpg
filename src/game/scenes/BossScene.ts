@@ -15,6 +15,9 @@ import { getRuntimeTuning } from '../runtime/RuntimeTuning.js';
 import { SceneRuntimeHost } from '../runtime/SceneRuntimeHost.js';
 import { runtimeDiagnostics } from '../runtime/RuntimeDiagnostics.js';
 import { createRuntimeRandom, deriveRuntimeSeed } from '../runtime/RuntimeRandom.js';
+import { getRarityColor, itemTextureKey } from '../visuals/VisualCatalog.js';
+import { buildBossEnvironment } from '../visuals/SceneEnvironment.js';
+import { clearTelegraph, drawAttackActive, drawAttackTelegraph, playDodgeSmoke, playSlash } from '../visuals/CombatVisuals.js';
 
 const CONTENT = buildContentRegistry();
 
@@ -37,6 +40,7 @@ export class BossScene extends Phaser.Scene {
   private playerSprite?: Phaser.GameObjects.Image;
   private bossSprite?: Phaser.GameObjects.Image;
   private hpText?: Phaser.GameObjects.Text;
+  private bossTelegraph?: Phaser.GameObjects.Graphics;
   private readonly lootSprites = new Map<string, Phaser.GameObjects.Image>();
   private keys: Partial<Record<'W'|'A'|'S'|'D', Phaser.Input.Keyboard.Key>> = {};
   private readonly actionBuffer = new GameplayActionBuffer();
@@ -61,6 +65,7 @@ export class BossScene extends Phaser.Scene {
     this.lootRng = createRuntimeRandom(deriveRuntimeSeed(runtimeSeed, 'loot:boss'));
     runtimeDiagnostics.setEnemies([]);
     this.cameras.main.setBackgroundColor('#180f12');
+    buildBossEnvironment(this);
     this.add.text(32, 24, 'Bandit Leader', { color: '#e5b0a7', fontSize: '28px' });
     this.add.text(32, 62, 'Read the telegraphs · dodge · punish recovery · E collects loot / exits after victory', { color: '#9f7773' });
 
@@ -81,9 +86,10 @@ export class BossScene extends Phaser.Scene {
       timingMultiplier: tuning.timingMultiplier,
     });
 
-    this.playerSprite = this.add.image(430, 360, 'rogue-placeholder').setScale(1.25);
-    this.bossSprite = this.add.image(720, 360, 'bandit-placeholder').setScale(2).setTint(0xc24d4d);
-    this.hpText = this.add.text(560, 445, '', { color: '#f0c9c0', fontSize: '18px' });
+    this.playerSprite = this.add.image(430, 360, 'rogue').setScale(1.35).setDepth(360);
+    this.bossSprite = this.add.image(720, 360, 'enemy-bandit-leader').setScale(1.35).setDepth(360);
+    this.bossTelegraph = this.add.graphics().setDepth(350);
+    this.hpText = this.add.text(510, 86, '', { color: '#f0c9c0', fontSize: '20px', backgroundColor: '#1d1115', padding: { x: 12, y: 6 } }).setDepth(2000);
     this.refreshBossLabel();
 
     this.lootRuntime = new LootRuntime({
@@ -151,7 +157,9 @@ export class BossScene extends Phaser.Scene {
     }, dtMs);
 
     const player = this.playerRuntime.snapshot;
-    this.playerSprite.setPosition(player.position.x, player.position.y).setRotation(player.facingRadians);
+    this.playerSprite.setPosition(player.position.x, player.position.y).setRotation(player.facingRadians).setDepth(player.position.y);
+    if (playerFrame.attackStarted || playerFrame.skillStarted) playSlash(this, player.position.x, player.position.y, player.facingRadians);
+    if (playerFrame.dodgeStarted) playDodgeSmoke(this, player.position.x, player.position.y);
     const boss = this.bossRuntime.snapshot;
     const bossX = this.bossSprite.x;
     const bossY = this.bossSprite.y;
@@ -176,14 +184,23 @@ export class BossScene extends Phaser.Scene {
       directionToPlayer: { x: dxToPlayer, y: dyToPlayer },
     }, dtMs);
     if (bossFrame.movement) {
+      playDodgeSmoke(this, this.bossSprite.x, this.bossSprite.y);
       this.bossSprite.setPosition(
         Phaser.Math.Clamp(this.bossSprite.x + bossFrame.movement.x, 120, 1160),
         Phaser.Math.Clamp(this.bossSprite.y + bossFrame.movement.y, 120, 600),
       );
     }
-    if (bossFrame.telegraph) this.bossSprite.setTint(0xe6b84a);
-    else if (bossFrame.attackWindowId) this.bossSprite.setTint(0xd33245);
-    else if (!this.victoryResolved) this.bossSprite.setTint(0xc24d4d);
+    this.bossSprite.setDepth(this.bossSprite.y);
+    if (bossFrame.telegraph) {
+      if (this.bossTelegraph) drawAttackTelegraph(this.bossTelegraph, this.bossSprite.x, this.bossSprite.y, 180, 0xf0b34f);
+      this.bossSprite.setTint(0xffcf79);
+    } else if (bossFrame.attackWindowId) {
+      if (this.bossTelegraph) drawAttackActive(this.bossTelegraph, this.bossSprite.x, this.bossSprite.y, 230);
+      this.bossSprite.setTint(0xff7171);
+    } else if (!this.victoryResolved) {
+      if (this.bossTelegraph) clearTelegraph(this.bossTelegraph);
+      this.bossSprite.clearTint();
+    }
 
     const bossAttackDistance = Math.hypot(
       player.position.x - this.bossSprite.x,
@@ -206,6 +223,7 @@ export class BossScene extends Phaser.Scene {
       runtimeDiagnostics.setEnemies([]);
       const session = getDefaultGameSession();
       session.markBanditLeaderDefeated();
+      if (this.bossTelegraph) clearTelegraph(this.bossTelegraph);
       this.bossSprite.setAlpha(0.35).setTint(0x6c6c6c);
       const table = CONTENT.lootTables.get('bandit_leader');
       const definitionId = table ? rollLoot(table.entries, session.getState().progression.level, this.lootRng) : null;
@@ -221,7 +239,13 @@ export class BossScene extends Phaser.Scene {
         const dropX = this.bossSprite.x;
         const dropY = this.bossSprite.y;
         const pickup = this.lootRuntime.spawnDrop({ item, position: { x: dropX, y: dropY } });
-        this.lootSprites.set(pickup.id, this.add.image(dropX, dropY, 'loot-placeholder').setScale(0.9));
+        const key = definition ? itemTextureKey(definition) : 'item-generic';
+        const lootImage = this.add.image(dropX, dropY, key)
+          .setScale(1.2)
+          .setTint(getRarityColor(item.rarity))
+          .setDepth(dropY + 3);
+        this.tweens.add({ targets: lootImage, y: dropY - 8, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        this.lootSprites.set(pickup.id, lootImage);
       }
       this.add.text(500, 500, 'Leader defeated — collect the drop, then press E to return', { color: '#e8d8b0', fontSize: '18px' });
     }
