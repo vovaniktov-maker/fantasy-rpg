@@ -15,6 +15,7 @@ export interface EnemyRuntimeConfig {
   hp: number;
   position: { x: number; y: number };
   combat: CombatRuntime;
+  damageMultiplier?: number;
 }
 
 export interface EnemyRuntimeFrame {
@@ -101,7 +102,7 @@ export class EnemyRuntime {
               attackId: attack.id,
               windowId: this.config.combat.beginAttack({
                 ownerId: this.config.id,
-                rawDamage: attack.damage,
+                rawDamage: attack.damage * Math.max(0, this.config.damageMultiplier ?? 1),
                 critChance: 0,
                 critDamage: 1,
               }),
