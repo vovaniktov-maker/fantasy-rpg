@@ -62,6 +62,32 @@ async function waitForScreen(page: Page, screen: string): Promise<void> {
   await expect.poll(() => runtimeScreen(page), { timeout: 10_000 }).toBe(screen);
 }
 
+interface RuntimeEnemyDiagnostic {
+  id: string;
+  x: number;
+  y: number;
+  hp: number;
+}
+
+async function runtimeEnemies(page: Page): Promise<RuntimeEnemyDiagnostic[]> {
+  const raw = (await page.getByTestId('runtime-enemies').textContent()) ?? '[]';
+  return JSON.parse(raw) as RuntimeEnemyDiagnostic[];
+}
+
+async function clearRuntimeEnemies(page: Page, maxEngagements = 24): Promise<void> {
+  for (let engagement = 0; engagement < maxEngagements; engagement += 1) {
+    const enemies = await runtimeEnemies(page);
+    if (enemies.length === 0) return;
+    const player = await playerPosition(page);
+    enemies.sort((a, b) =>
+      Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y)
+    );
+    const target = enemies[0];
+    await attackNear(page, target.x, target.y, 2);
+  }
+  expect(await runtimeEnemies(page)).toHaveLength(0);
+}
+
 async function equipFirstGear(page: Page): Promise<void> {
   await page.getByRole('button', { name: /Inventory/ }).click();
   const gearIds = [
@@ -105,17 +131,7 @@ test('vertical slice completes through real runtime input and survives reload', 
   await page.keyboard.press('KeyE');
   await waitForScreen(page, 'forest');
 
-  await attackNear(page, 740, 360, 5);
-  await attackNear(page, 500, 300, 4);
-  await attackNear(page, 900, 220, 3);
-  await attackNear(page, 430, 480, 4);
-  await attackNear(page, 860, 480, 3);
-  await attackNear(page, 640, 360, 5);
-
-  if ((await page.getByTestId('runtime-forest-cleared').textContent()) !== 'true') {
-    await attackNear(page, 900, 220, 3);
-    await attackNear(page, 640, 360, 5);
-  }
+  await clearRuntimeEnemies(page);
   await expect(page.getByTestId('runtime-forest-cleared')).toHaveText('true');
 
   await equipFirstGear(page);
@@ -126,20 +142,8 @@ test('vertical slice completes through real runtime input and survives reload', 
   }
   await waitForScreen(page, 'hideout');
 
-  const hideoutTargets = [
-    [300, 230], [480, 490], [660, 230], [840, 490], [1020, 230],
-    [300, 490], [480, 230], [660, 490], [840, 230], [1020, 490],
-  ] as const;
-  for (let sweep = 0; sweep < 2 && await runtimeScreen(page) === 'hideout'; sweep += 1) {
-    for (const [x, y] of hideoutTargets) {
-      await attackNear(page, x, y, 2);
-      if (await runtimeScreen(page) !== 'hideout') break;
-    }
-    if (await runtimeScreen(page) === 'hideout') {
-      await page.keyboard.press('KeyE');
-      await page.waitForTimeout(200);
-    }
-  }
+  await clearRuntimeEnemies(page, 40);
+  await page.keyboard.press('KeyE');
   await waitForScreen(page, 'boss');
 
   await moveTo(page, 650, 360, 45);
