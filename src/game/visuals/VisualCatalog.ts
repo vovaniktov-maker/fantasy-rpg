@@ -28,7 +28,7 @@ export function itemTextureKey(item: Pick<ItemDefinition, 'id' | 'kind' | 'equip
   return item.kind === 'material' ? 'item-material' : 'item-generic';
 }
 
-export function getRarityColor(rarity: ItemRarity): number {
+export function getRarityColor(rarity?: ItemRarity): number {
   switch (rarity) {
     case 'uncommon': return 0x63c174;
     case 'rare': return 0x5aa2ff;
