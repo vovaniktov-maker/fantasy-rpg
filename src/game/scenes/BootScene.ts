@@ -2,9 +2,14 @@ import Phaser from 'phaser';
 import { buildContentRegistry } from '../../domain/content/contentRegistry';
 import { validateContent } from '../../domain/content/validateContent';
 
-export function ensureDevelopmentTexture(scene: Phaser.Scene, key: string, size = 32): boolean {
-  if (scene.textures.exists(key)) return false;
-  const graphics = scene.add.graphics();
+export function ensureDevelopmentTexture(
+  textures: Phaser.Textures.TextureManager,
+  add: Phaser.GameObjects.GameObjectFactory,
+  key: string,
+  size = 32
+): boolean {
+  if (textures.exists(key)) return false;
+  const graphics = add.graphics();
   graphics.fillStyle(0x7c3aed, 1);
   graphics.fillRect(0, 0, size, size);
   graphics.lineStyle(2, 0xffffff, 1);
@@ -21,7 +26,9 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     const issues = validateContent(buildContentRegistry());
     if (issues.length > 0) throw new Error(`Invalid gameplay content:\n${issues.map((issue) => `- ${issue.message}`).join('\n')}`);
-    for (const key of ['rogue-placeholder', 'bandit-placeholder', 'loot-placeholder']) ensureDevelopmentTexture(this, key);
+    for (const key of ['rogue-placeholder', 'bandit-placeholder', 'loot-placeholder']) {
+      ensureDevelopmentTexture(this.textures, this.add, key);
+    }
     this.scene.start('OutpostScene');
   }
 }
