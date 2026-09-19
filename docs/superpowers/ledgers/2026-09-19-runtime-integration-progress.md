@@ -11,3 +11,6 @@ Pre-flight:
 - Task 7 -> Task 8: LootRuntime is owned by SceneRuntimeHost and scene integration; interfaces align.
 - Task 8 -> Task 11: real scene runtime becomes Playwright acceptance surface; interfaces align.
 - Task 9 -> Task 11: BossRuntime replaces click-to-damage before E2E is rewritten; interfaces align.
+
+Task 1: Ruling: active-slot sanitation fixture must learn `assassin_shadow_dash` before expecting `shadow_dash` to survive — the spec requires only learned active skills in slots — cost if wrong: one test fixture change.
+Task 1: Ruling: death/checkpoint fixture must contain the equipped dagger instance — stale equipment references are intentionally sanitized on load — cost if wrong: one test fixture change.

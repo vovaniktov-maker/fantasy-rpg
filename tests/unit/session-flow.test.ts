@@ -68,6 +68,7 @@ describe('GameSession', () => {
     state.progression = { level: 4, xp: 23, unspentSkillPoints: 2 };
     state.skills.learned.assassin_precision = 2;
     state.inventory.slots[0] = potion('hp-1', 'health_potion', 3);
+    state.inventory.slots[1] = { instanceId: 'dagger-1', definitionId: 'steel_dagger', quantity: 1, itemLevel: 4, rarity: 'rare' };
     state.equipment.weapon = 'dagger-1';
     state.player.position = { x: 18, y: 22 };
     session.replaceState(state);

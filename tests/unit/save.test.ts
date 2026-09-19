@@ -33,7 +33,7 @@ describe('saves', () => {
   it('removes unknown skills, invalid active slots, and stale equipment references', () => {
     const content = buildContentRegistry();
     const state = createInitialGameState();
-    state.skills.learned = { assassin_precision: 99, removed_skill: 3 };
+    state.skills.learned = { assassin_precision: 99, assassin_shadow_dash: 1, removed_skill: 3 };
     state.skills.equippedActiveSkillIds = ['removed_active', 'shadow_dash', null, null];
     state.inventory.slots[0] = {
       instanceId: 'dagger-1',
