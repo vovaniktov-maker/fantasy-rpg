@@ -1,9 +1,6 @@
 import Phaser from 'phaser';
 
-interface CombatVisualScene {
-  add: Phaser.GameObjects.GameObjectFactory;
-  tweens: Phaser.Tweens.TweenManager;
-}
+type CombatVisualScene = any;
 
 export function drawAttackTelegraph(
   graphics: Phaser.GameObjects.Graphics,
