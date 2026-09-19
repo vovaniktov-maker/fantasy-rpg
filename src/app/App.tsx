@@ -10,6 +10,7 @@ import { MerchantPanel } from '../ui/merchant/MerchantPanel';
 import { PauseMenu } from '../ui/menus/PauseMenu';
 import { TestFlowPanel } from '../ui/test/TestFlowPanel';
 import { useGameSnapshot } from '../ui/useGameSnapshot';
+import { useGameplayControls } from '../ui/useGameplayControls';
 import '../styles/game-ui.css';
 
 const merchantOffers = [
@@ -27,6 +28,7 @@ export default function App() {
   const [questOpen, setQuestOpen] = useState(true);
   const [paused, setPaused] = useState(false);
   const testMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('testMode') === '1';
+  useGameplayControls({ inventoryOpen, skillsOpen, merchantOpen, paused });
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
