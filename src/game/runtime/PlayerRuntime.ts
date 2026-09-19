@@ -78,7 +78,7 @@ export class PlayerRuntime {
     this.position = { ...config.position };
     this.hp = Math.min(config.hp, this.stats.hp);
     this.movement = new PlayerController(this.stats.moveSpeed);
-    this.combatController = this.createCombatController(this.combatController?.getSnapshot().energy ?? this.stats.energy);
+    this.combatController = this.createCombatController(this.stats.energy);
   }
 
   setControls(snapshot: GameplayControlSnapshot): void {
