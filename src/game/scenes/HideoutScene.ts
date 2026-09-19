@@ -100,7 +100,7 @@ export class HideoutScene extends Phaser.Scene {
         const runtime = new EnemyRuntime({
           id: `hideout-${enemyId}-${enemyIndex}`,
           definition,
-          hp: Math.max(10, Math.round(baseHp * tuning.enemyHpMultiplier)),
+          hp: Math.max(1, Math.round(baseHp * tuning.enemyHpMultiplier)),
           position: { x, y },
           combat: this.combat,
         });
