@@ -99,6 +99,8 @@ async function runtimeEnemies(page: Page): Promise<RuntimeEnemyDiagnostic[]> {
 }
 
 async function clearRuntimeEnemies(page: Page, maxEngagements = 24): Promise<void> {
+  await expect.poll(async () => (await runtimeEnemies(page)).length, { timeout: 5_000 }).toBeGreaterThan(0);
+
   for (let engagement = 0; engagement < maxEngagements; engagement += 1) {
     const enemies = await runtimeEnemies(page);
     if (enemies.length === 0) return;
