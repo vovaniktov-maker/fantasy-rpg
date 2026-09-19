@@ -1,0 +1,28 @@
+import type { AffixDefinition } from '../domain/items/affixes.js';
+
+export const affixDefinitions: AffixDefinition[] = [
+  { id: 'brutal', compatibleItemTags: ['weapon'], exclusiveGroup: 'damage-prefix', modifiers: [{ stat: 'attackPower', mode: 'addPercent', value: 0.08 }] },
+  { id: 'razor_edged', compatibleItemTags: ['weapon'], exclusiveGroup: 'damage-prefix', modifiers: [{ stat: 'attackPower', mode: 'flat', value: 4 }] },
+  { id: 'keen', compatibleItemTags: ['weapon','accessory'], exclusiveGroup: 'crit-prefix', modifiers: [{ stat: 'critChance', mode: 'addPercent', value: 0.04 }] },
+  { id: 'deadly', compatibleItemTags: ['weapon','accessory'], exclusiveGroup: 'crit-suffix', modifiers: [{ stat: 'critDamage', mode: 'addPercent', value: 0.12 }] },
+  { id: 'quick', compatibleItemTags: ['weapon','gloves'], exclusiveGroup: 'speed-prefix', modifiers: [{ stat: 'attackSpeed', mode: 'addPercent', value: 0.06 }] },
+  { id: 'relentless', compatibleItemTags: ['gear'], exclusiveGroup: 'resource-prefix', modifiers: [{ stat: 'energy', mode: 'addPercent', value: 0.08 }] },
+  { id: 'energetic', compatibleItemTags: ['gear'], exclusiveGroup: 'resource-prefix', modifiers: [{ stat: 'energy', mode: 'flat', value: 10 }] },
+  { id: 'fleet', compatibleItemTags: ['boots','accessory'], exclusiveGroup: 'mobility-prefix', modifiers: [{ stat: 'moveSpeed', mode: 'addPercent', value: 0.06 }] },
+  { id: 'longstep', compatibleItemTags: ['boots','gear'], exclusiveGroup: 'mobility-suffix', modifiers: [{ stat: 'dodgeDistance', mode: 'addPercent', value: 0.08 }] },
+  { id: 'efficient', compatibleItemTags: ['accessory','gear'], exclusiveGroup: 'cooldown-prefix', modifiers: [{ stat: 'cooldownReduction', mode: 'addPercent', value: 0.03 }] },
+  { id: 'sturdy', compatibleItemTags: ['armor'], exclusiveGroup: 'defense-prefix', modifiers: [{ stat: 'armor', mode: 'flat', value: 5 }] },
+  { id: 'hardened', compatibleItemTags: ['armor'], exclusiveGroup: 'defense-prefix', modifiers: [{ stat: 'armor', mode: 'addPercent', value: 0.1 }] },
+  { id: 'vital', compatibleItemTags: ['armor','accessory'], exclusiveGroup: 'life-prefix', modifiers: [{ stat: 'hp', mode: 'flat', value: 12 }] },
+  { id: 'vigorous', compatibleItemTags: ['gear'], exclusiveGroup: 'life-suffix', modifiers: [{ stat: 'hp', mode: 'addPercent', value: 0.08 }] },
+  { id: 'balanced', compatibleItemTags: ['weapon'], exclusiveGroup: 'speed-suffix', modifiers: [{ stat: 'attackSpeed', mode: 'addPercent', value: 0.04 }] },
+  { id: 'murderous', compatibleItemTags: ['dagger'], exclusiveGroup: 'crit-prefix', modifiers: [{ stat: 'critChance', mode: 'addPercent', value: 0.06 }] },
+  { id: 'duelist', compatibleItemTags: ['weapon','gloves'], exclusiveGroup: 'duelist-tag', modifiers: [{ stat: 'attackSpeed', mode: 'addPercent', value: 0.05 }, { stat: 'moveSpeed', mode: 'addPercent', value: 0.02 }] },
+  { id: 'assassins', compatibleItemTags: ['dagger','accessory'], exclusiveGroup: 'assassin-tag', modifiers: [{ stat: 'critDamage', mode: 'addPercent', value: 0.15 }] },
+  { id: 'venomous', compatibleItemTags: ['dagger','accessory'], exclusiveGroup: 'poison-tag', modifiers: [{ stat: 'attackPower', mode: 'addPercent', value: 0.05 }] },
+  { id: 'nimble', compatibleItemTags: ['light-armor'], exclusiveGroup: 'mobility-prefix', modifiers: [{ stat: 'moveSpeed', mode: 'addPercent', value: 0.04 }] },
+  { id: 'reflexive', compatibleItemTags: ['light-armor'], exclusiveGroup: 'mobility-suffix', modifiers: [{ stat: 'dodgeDistance', mode: 'flat', value: 10 }] },
+  { id: 'focused', compatibleItemTags: ['head','accessory','gear'], exclusiveGroup: 'cooldown-prefix', modifiers: [{ stat: 'cooldownReduction', mode: 'addPercent', value: 0.025 }] },
+  { id: 'guarded', compatibleItemTags: ['body','head','armor'], exclusiveGroup: 'defense-suffix', modifiers: [{ stat: 'armor', mode: 'flat', value: 3 }] },
+  { id: 'predators', compatibleItemTags: ['weapon','accessory'], exclusiveGroup: 'damage-suffix', modifiers: [{ stat: 'attackPower', mode: 'addPercent', value: 0.06 }] },
+];
