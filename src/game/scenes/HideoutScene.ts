@@ -16,6 +16,7 @@ import { SceneRuntimeHost } from '../runtime/SceneRuntimeHost.js';
 import { runtimeDiagnostics } from '../runtime/RuntimeDiagnostics.js';
 import { createRuntimeRandom, deriveRuntimeSeed } from '../runtime/RuntimeRandom.js';
 import { DungeonAssembler } from '../world/DungeonAssembler.js';
+import { DungeonEncounterGate } from '../world/DungeonEncounterGate.js';
 
 const CONTENT = buildContentRegistry();
 
@@ -35,12 +36,13 @@ export class HideoutScene extends Phaser.Scene {
   private playerSprite?: Phaser.GameObjects.Image;
   private combat?: CombatRuntime;
   private lootRuntime?: LootRuntime;
-  private readonly enemies: Array<{ runtime: EnemyRuntime; image: Phaser.GameObjects.Image; definition: EnemyDefinition }> = [];
+  private readonly enemies: Array<{ runtime: EnemyRuntime; image: Phaser.GameObjects.Image; definition: EnemyDefinition; roomIndex: number }> = [];
   private readonly lootSprites = new Map<string, Phaser.GameObjects.Image>();
   private keys: Partial<Record<'W'|'A'|'S'|'D', Phaser.Input.Keyboard.Key>> = {};
   private readonly actionBuffer = new GameplayActionBuffer();
   private syncElapsed = 0;
   private cleared = false;
+  private encounterGate?: DungeonEncounterGate;
   private combatRng = createRuntimeRandom(1);
   private lootSeedBase = 1;
 
@@ -62,6 +64,7 @@ export class HideoutScene extends Phaser.Scene {
     const generated = generateDungeon(data?.seed ?? state.runSeed, dungeonRoomDefinitions);
     if (!generated.ok) throw new Error(generated.error.message);
     const rooms = new DungeonAssembler(dungeonRoomDefinitions).assemble(generated.dungeon);
+    this.encounterGate = new DungeonEncounterGate(rooms.map((room) => room.encounterIds.length));
 
     this.cameras.main.setBackgroundColor('#17120f');
     this.add.text(32, 24, 'Bandit Hideout', { color: '#d5c0a0', fontSize: '24px' });
@@ -91,13 +94,14 @@ export class HideoutScene extends Phaser.Scene {
     });
 
     let enemyIndex = 0;
-    for (const room of rooms) {
-      this.add.text(40 + room.x * 0.04, 105 + (enemyIndex % 3) * 20, room.definitionId, { color: '#6f6255', fontSize: '12px' });
+    for (const [roomIndex, room] of rooms.entries()) {
+      this.add.text(40 + roomIndex * 170, 105, room.definitionId, { color: '#6f6255', fontSize: '12px' });
+      let enemyInRoom = 0;
       for (const enemyId of room.encounterIds) {
         const definition = CONTENT.enemies.get(enemyId);
         if (!definition) continue;
-        const x = 300 + (enemyIndex % 5) * 180;
-        const y = 230 + (enemyIndex % 2) * 260;
+        const x = 360 + (enemyInRoom % 3) * 240;
+        const y = 245 + (enemyInRoom % 2) * 230;
         const baseHp = definition.archetype === 'heavy' ? 160 : 85;
         const runtime = new EnemyRuntime({
           id: `hideout-${enemyId}-${enemyIndex}`,
@@ -106,9 +110,12 @@ export class HideoutScene extends Phaser.Scene {
           position: { x, y },
           combat: this.combat,
         });
-        const image = this.add.image(x, y, 'bandit-placeholder').setTint(0x6e4334);
-        this.enemies.push({ runtime, image, definition });
+        const image = this.add.image(x, y, 'bandit-placeholder')
+          .setTint(0x6e4334)
+          .setVisible(this.encounterGate.isRoomActive(roomIndex));
+        this.enemies.push({ runtime, image, definition, roomIndex });
         enemyIndex += 1;
+        enemyInRoom += 1;
       }
     }
 
@@ -163,7 +170,7 @@ export class HideoutScene extends Phaser.Scene {
     const attackIds = [frame.attackWindowId, frame.skillAttackWindowId].filter((id): id is string => !!id);
     for (const entry of this.enemies) {
       const current = entry.runtime.snapshot;
-      if (!current.alive) continue;
+      if (!current.alive || !this.encounterGate?.isRoomActive(entry.roomIndex)) continue;
       const dx = player.position.x - current.x;
       const dy = player.position.y - current.y;
       const distance = Math.hypot(dx, dy);
@@ -185,6 +192,12 @@ export class HideoutScene extends Phaser.Scene {
 
       if (entry.runtime.consumeDeathEvent()) {
         entry.image.setVisible(false);
+        this.encounterGate?.recordEnemyDeath(entry.roomIndex);
+        const activeRoomIndex = this.encounterGate?.activeRoomIndex ?? null;
+        for (const candidate of this.enemies) {
+          if (candidate.runtime.isDead()) continue;
+          candidate.image.setVisible(activeRoomIndex === candidate.roomIndex);
+        }
         const lootRng = createRuntimeRandom(deriveRuntimeSeed(this.lootSeedBase, `loot:${entry.runtime.snapshot.id}`));
         const drop = createEnemyDrop(entry.definition.id, getDefaultGameSession().getState().progression.level, lootRng, CONTENT);
         if (drop) {
@@ -195,11 +208,12 @@ export class HideoutScene extends Phaser.Scene {
     }
 
     runtimeDiagnostics.setEnemies(this.enemies
+      .filter((entry) => this.encounterGate?.isRoomActive(entry.roomIndex))
       .map((entry) => entry.runtime.snapshot)
       .filter((enemy) => enemy.alive)
       .map((enemy) => ({ id: enemy.id, x: Math.round(enemy.x), y: Math.round(enemy.y), hp: enemy.hp })));
 
-    if (!this.cleared && this.enemies.every((entry) => entry.runtime.isDead())) {
+    if (!this.cleared && this.encounterGate?.cleared) {
       this.cleared = true;
       this.add.text(470, 100, 'Hideout route cleared — press E for the leader', { color: '#e0c99d' });
     }
