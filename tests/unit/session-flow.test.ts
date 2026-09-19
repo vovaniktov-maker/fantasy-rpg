@@ -35,7 +35,9 @@ describe('GameSession', () => {
 
   it('instantly consumes one health potion and respects shared cooldown', () => {
     let now = 1_000;
-    const { session } = makeSession(() => now);
+    const { session, bridge } = makeSession(() => now);
+    const events: unknown[] = [];
+    bridge.onEvent((event) => events.push(event));
     const state = session.startNew();
     state.player.hp = 35;
     state.inventory.slots[0] = potion('hp-1', 'health_potion', 2);
@@ -44,6 +46,7 @@ describe('GameSession', () => {
     expect(session.usePotion('health')).toBe(true);
     expect(session.getState().player.hp).toBe(85);
     expect(session.getState().inventory.slots[0]?.quantity).toBe(1);
+    expect(events).toContainEqual({ type: 'PLAYER_RESOURCES_SYNCED', hp: 85, energy: 100 });
 
     expect(session.usePotion('health')).toBe(false);
     expect(session.getState().inventory.slots[0]?.quantity).toBe(1);
