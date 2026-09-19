@@ -7,6 +7,7 @@ export interface PlayerCombatConfig {
   maxEnergy: number;
   learnedSkills: ReadonlySet<string>;
   equippedSkills: Array<string | null>;
+  attackSpeed?: number;
   dodgeCost?: number;
   dodgeDurationMs?: number;
   dodgeInvulnerabilityMs?: number;
@@ -18,14 +19,31 @@ export interface PlayerCombatSnapshot {
   energy: number;
   dodge: DodgeState;
   combo: ComboState;
+  attackRecoveryRemainingMs: number;
 }
+
+export interface BasicAttackRequest {
+  accepted: boolean;
+  comboStep: number;
+  activeMs: number;
+  recoveryMs: number;
+  damageMultiplier: number;
+}
+
+const COMBO_WINDOWS = [
+  { activeMs: 110, recoveryMs: 170, damageMultiplier: 1 },
+  { activeMs: 115, recoveryMs: 175, damageMultiplier: 1 },
+  { activeMs: 150, recoveryMs: 260, damageMultiplier: 1.35 },
+] as const;
 
 export class PlayerCombatController {
   private energyState: EnergyState;
   private dodgeState: DodgeState = { active: false, remainingMs: 0, invulnerableRemainingMs: 0 };
   private comboState: ComboState = { step: 0, timeSinceAdvanceMs: 0, chainLength: 3, resetAfterMs: 600 };
+  private attackRecoveryRemainingMs = 0;
   private readonly learnedSkills: Set<string>;
   private readonly equippedSkills: Array<string | null>;
+  private readonly attackSpeed: number;
   private readonly dodgeCost: number;
   private readonly dodgeDurationMs: number;
   private readonly dodgeInvulnerabilityMs: number;
@@ -41,15 +59,18 @@ export class PlayerCombatController {
     this.learnedSkills = new Set(config.learnedSkills);
     this.equippedSkills = [...config.equippedSkills].slice(0, 4);
     while (this.equippedSkills.length < 4) this.equippedSkills.push(null);
+    this.attackSpeed = Math.max(0.1, config.attackSpeed ?? 1);
     this.dodgeCost = config.dodgeCost ?? 30;
     this.dodgeDurationMs = config.dodgeDurationMs ?? 260;
     this.dodgeInvulnerabilityMs = config.dodgeInvulnerabilityMs ?? 160;
   }
 
   tick(dtMs: number): void {
-    this.energyState = tickEnergy(this.energyState, dtMs);
-    this.dodgeState = tickDodge(this.dodgeState, dtMs);
-    this.comboState = { ...this.comboState, timeSinceAdvanceMs: this.comboState.timeSinceAdvanceMs + Math.max(0, dtMs) };
+    const dt = Math.max(0, dtMs);
+    this.energyState = tickEnergy(this.energyState, dt);
+    this.dodgeState = tickDodge(this.dodgeState, dt);
+    this.comboState = { ...this.comboState, timeSinceAdvanceMs: this.comboState.timeSinceAdvanceMs + dt };
+    this.attackRecoveryRemainingMs = Math.max(0, this.attackRecoveryRemainingMs - dt);
   }
 
   requestDodge(): { started: boolean } {
@@ -61,19 +82,38 @@ export class PlayerCombatController {
     return { started: true };
   }
 
-  requestBasicAttack(): { accepted: boolean; comboStep: number } {
-    if (this.dodgeState.active) return { accepted: false, comboStep: this.comboState.step };
+  requestBasicAttack(): BasicAttackRequest {
+    if (this.dodgeState.active || this.attackRecoveryRemainingMs > 0) {
+      return { accepted: false, comboStep: this.comboState.step, activeMs: 0, recoveryMs: 0, damageMultiplier: 1 };
+    }
     this.comboState = advanceCombo(this.comboState, this.comboState.timeSinceAdvanceMs);
-    return { accepted: true, comboStep: this.comboState.step };
+    const window = COMBO_WINDOWS[Math.max(0, this.comboState.step - 1)] ?? COMBO_WINDOWS[0];
+    const activeMs = Math.round(window.activeMs / this.attackSpeed);
+    const recoveryMs = Math.round(window.recoveryMs / this.attackSpeed);
+    this.attackRecoveryRemainingMs = activeMs + recoveryMs;
+    return {
+      accepted: true,
+      comboStep: this.comboState.step,
+      activeMs,
+      recoveryMs,
+      damageMultiplier: window.damageMultiplier,
+    };
   }
 
-  requestSkill(slotIndex: number): { accepted: boolean; skillId?: string } {
+  requestSkill(slotIndex: number, energyCost = 0): { accepted: boolean; skillId?: string } {
+    if (this.dodgeState.active) return { accepted: false };
     const skillId = this.equippedSkills[slotIndex] ?? null;
-    if (!skillId || !this.learnedSkills.has(skillId)) return { accepted: false };
+    if (!skillId || !this.learnedSkills.has(skillId) || this.energyState.current < energyCost) return { accepted: false };
+    if (energyCost > 0) this.energyState = spendEnergy(this.energyState, energyCost);
     return { accepted: true, skillId };
   }
 
   getSnapshot(): PlayerCombatSnapshot {
-    return { energy: this.energyState.current, dodge: { ...this.dodgeState }, combo: { ...this.comboState } };
+    return {
+      energy: this.energyState.current,
+      dodge: { ...this.dodgeState },
+      combo: { ...this.comboState },
+      attackRecoveryRemainingMs: this.attackRecoveryRemainingMs,
+    };
   }
 }
