@@ -3,6 +3,7 @@ import { enemyDefinitions, type EnemyDefinition } from '../../content/enemies.js
 import { buildContentRegistry } from '../../domain/content/contentRegistry.js';
 import { deriveCombatStats } from '../../domain/stats/DerivedStatsService.js';
 import { getDefaultGameSession } from '../GameSession.js';
+import { gameBridge } from '../bridge/GameBridge.js';
 import { GameplayActionBuffer } from '../input/GameplayActionBuffer.js';
 import { gameplayControlState, type GameplayControlSnapshot } from '../runtime/GameplayControlState.js';
 import { CombatRuntime } from '../runtime/CombatRuntime.js';
@@ -123,6 +124,11 @@ export class ForestScene extends Phaser.Scene {
     this.keyD = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
     this.host = new SceneRuntimeHost(gameplayControlState);
+    this.host.own(gameBridge.onEvent((event) => {
+      if (event.type === 'PLAYER_RESOURCES_SYNCED') {
+        this.playerRuntime?.syncResources({ hp: event.hp, energy: event.energy });
+      }
+    }));
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.code === 'KeyE') this.actionBuffer.queueInteract();
       if (event.code === 'Space') this.actionBuffer.queueDodge();
