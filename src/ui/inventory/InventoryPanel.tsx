@@ -15,6 +15,11 @@ export function InventoryPanel({ open, onClose }: { open: boolean; onClose: () =
     [state.inventory.slots, selectedId],
   );
   const selectedDefinition = selected ? CONTENT.items.get(selected.definitionId) : undefined;
+  const potionKind = selectedDefinition?.id === 'health_potion'
+    ? 'health'
+    : selectedDefinition?.id === 'energy_potion'
+      ? 'energy'
+      : null;
 
   if (!open) return null;
   return (
@@ -33,6 +38,14 @@ export function InventoryPanel({ open, onClose }: { open: boolean; onClose: () =
         ))}
       </div>
       <ItemTooltip item={selected} />
+      {selected && potionKind && (
+        <button
+          aria-label={`Use ${potionKind} potion`}
+          onClick={() => gameBridge.dispatch({ type: 'USE_POTION', kind: potionKind })}
+        >
+          Use {potionKind} potion
+        </button>
+      )}
       {selected && selectedDefinition?.kind === 'gear' && selectedDefinition.equipSlot && (
         <button
           onClick={() => gameBridge.dispatch({
