@@ -1,8 +1,9 @@
 import { createInitialGameState, type GameState } from '../../domain/state/GameState.js';
-import type { GameCommand } from './gameMessages.js';
+import type { GameCommand, GameEvent } from './gameMessages.js';
 
 type StateListener = (state: Readonly<GameState>) => void;
 type CommandListener = (command: GameCommand) => void;
+type EventListener = (event: GameEvent) => void;
 
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -16,6 +17,7 @@ export class GameBridge {
   private state: GameState;
   private readonly stateListeners = new Set<StateListener>();
   private readonly commandListeners = new Set<CommandListener>();
+  private readonly eventListeners = new Set<EventListener>();
 
   constructor(initial: GameState = createInitialGameState()) {
     this.state = deepFreeze(structuredClone(initial));
@@ -38,6 +40,15 @@ export class GameBridge {
   onCommand(listener: CommandListener): () => void {
     this.commandListeners.add(listener);
     return () => this.commandListeners.delete(listener);
+  }
+
+  emit(event: GameEvent): void {
+    for (const listener of this.eventListeners) listener(event);
+  }
+
+  onEvent(listener: EventListener): () => void {
+    this.eventListeners.add(listener);
+    return () => this.eventListeners.delete(listener);
   }
 
   getSnapshot(): Readonly<GameState> {
