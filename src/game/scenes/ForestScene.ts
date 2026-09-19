@@ -14,6 +14,9 @@ import { getRuntimeTuning } from '../runtime/RuntimeTuning.js';
 import { SceneRuntimeHost } from '../runtime/SceneRuntimeHost.js';
 import { runtimeDiagnostics } from '../runtime/RuntimeDiagnostics.js';
 import { createRuntimeRandom, deriveRuntimeSeed } from '../runtime/RuntimeRandom.js';
+import { enemyTextureKey, getRarityColor, itemTextureKey } from '../visuals/VisualCatalog.js';
+import { buildForestEnvironment } from '../visuals/SceneEnvironment.js';
+import { clearTelegraph, drawAttackActive, drawAttackTelegraph, playDodgeSmoke, playSlash } from '../visuals/CombatVisuals.js';
 
 const CONTENT = buildContentRegistry();
 
@@ -41,7 +44,7 @@ export class ForestScene extends Phaser.Scene {
   private host?: SceneRuntimeHost;
   private playerRuntime?: PlayerRuntime;
   private playerSprite?: Phaser.GameObjects.Image;
-  private readonly enemies: Array<{ runtime: EnemyRuntime; image: Phaser.GameObjects.Image; definition: EnemyDefinition }> = [];
+  private readonly enemies: Array<{ runtime: EnemyRuntime; image: Phaser.GameObjects.Image; definition: EnemyDefinition; telegraph: Phaser.GameObjects.Graphics }> = [];
   private lootRuntime?: LootRuntime;
   private readonly lootSprites = new Map<string, Phaser.GameObjects.Image>();
   private combat?: CombatRuntime;
@@ -71,6 +74,7 @@ export class ForestScene extends Phaser.Scene {
     this.combatRng = createRuntimeRandom(deriveRuntimeSeed(runtimeSeed, 'combat:forest'));
     this.lootSeedBase = runtimeSeed;
     this.cameras.main.setBackgroundColor('#0c1710');
+    buildForestEnvironment(this);
     this.add.text(32, 24, 'Cursed Forest', { color: '#b8d0a8', fontSize: '24px' });
     this.add.text(32, 64, 'Defeat the patrol · E picks up loot · E enters the hideout after the patrol falls', { color: '#71836b' });
 
@@ -85,7 +89,7 @@ export class ForestScene extends Phaser.Scene {
       equippedSkills: state.skills.equippedActiveSkillIds,
       combat: this.combat,
     });
-    this.playerSprite = this.add.image(640, 360, 'rogue-placeholder').setScale(1.25);
+    this.playerSprite = this.add.image(640, 360, 'rogue').setScale(1.35).setDepth(360);
 
     this.lootRuntime = new LootRuntime({
       content: CONTENT,
@@ -113,8 +117,11 @@ export class ForestScene extends Phaser.Scene {
         position: positions[index],
         combat: this.combat!,
       });
-      const image = this.add.image(positions[index].x, positions[index].y, 'bandit-placeholder').setTint(0x7a3f32);
-      this.enemies.push({ runtime, image, definition });
+      const image = this.add.image(positions[index].x, positions[index].y, enemyTextureKey(definition.id))
+        .setScale(definition.archetype === 'heavy' ? 1.18 : 1.08)
+        .setDepth(positions[index].y);
+      const telegraph = this.add.graphics().setDepth(positions[index].y - 1);
+      this.enemies.push({ runtime, image, definition, telegraph });
     });
 
     const keyboard = this.input.keyboard;
@@ -169,7 +176,9 @@ export class ForestScene extends Phaser.Scene {
     }, dtMs);
 
     const player = this.playerRuntime.snapshot;
-    this.playerSprite.setPosition(player.position.x, player.position.y).setRotation(player.facingRadians);
+    this.playerSprite.setPosition(player.position.x, player.position.y).setRotation(player.facingRadians).setDepth(player.position.y);
+    if (frame.attackStarted || frame.skillStarted) playSlash(this, player.position.x, player.position.y, player.facingRadians);
+    if (frame.dodgeStarted) playDodgeSmoke(this, player.position.x, player.position.y);
 
     const playerAttackIds = [frame.attackWindowId, frame.skillAttackWindowId].filter((id): id is string => !!id);
     for (const entry of this.enemies) {
@@ -186,10 +195,19 @@ export class ForestScene extends Phaser.Scene {
         directionToPlayer: { x: dx, y: dy },
       }, dtMs);
       const next = entry.runtime.snapshot;
-      entry.image.setPosition(next.x, next.y);
-      if (enemyFrame.telegraph) entry.image.setTint(0xe6b84a);
-      else if (enemyFrame.attackWindowId) entry.image.setTint(0xd33f3f);
-      else entry.image.setTint(0x7a3f32);
+      entry.image.setPosition(next.x, next.y).setDepth(next.y);
+      entry.telegraph.setDepth(next.y - 1);
+      const attackRadius = Math.min(110, Math.max(...entry.definition.attacks.map((attack) => attack.range)));
+      if (enemyFrame.telegraph) {
+        drawAttackTelegraph(entry.telegraph, next.x, next.y, attackRadius);
+        entry.image.setTint(0xffd27a);
+      } else if (enemyFrame.attackWindowId) {
+        drawAttackActive(entry.telegraph, next.x, next.y, attackRadius);
+        entry.image.setTint(0xff7777);
+      } else {
+        clearTelegraph(entry.telegraph);
+        entry.image.clearTint();
+      }
 
       if (enemyFrame.attackWindowId) {
         const maxRange = Math.max(...entry.definition.attacks.map((attack) => attack.range));
@@ -200,12 +218,20 @@ export class ForestScene extends Phaser.Scene {
       }
 
       if (entry.runtime.consumeDeathEvent()) {
+        clearTelegraph(entry.telegraph);
         entry.image.setVisible(false);
         const lootRng = createRuntimeRandom(deriveRuntimeSeed(this.lootSeedBase, `loot:${entry.runtime.snapshot.id}`));
         const drop = createEnemyDrop(entry.definition.id, getDefaultGameSession().getState().progression.level, lootRng, CONTENT);
         if (drop) {
           const pickup = this.lootRuntime.spawnDrop({ item: drop, position: { x: next.x, y: next.y } });
-          this.lootSprites.set(pickup.id, this.add.image(next.x, next.y, 'loot-placeholder').setScale(0.8));
+          const definition = CONTENT.items.get(drop.definitionId);
+          const key = definition ? itemTextureKey(definition) : 'item-generic';
+          const lootImage = this.add.image(next.x, next.y, key)
+            .setScale(1.05)
+            .setTint(getRarityColor(drop.rarity))
+            .setDepth(next.y + 2);
+          this.tweens.add({ targets: lootImage, y: next.y - 6, duration: 550, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+          this.lootSprites.set(pickup.id, lootImage);
         }
       }
     }
