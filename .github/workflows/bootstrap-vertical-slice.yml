@@ -1,0 +1,86 @@
+name: Bootstrap vertical slice
+
+on:
+  push:
+    paths:
+      - '.github/workflows/bootstrap-vertical-slice.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout bootstrap
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore project archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/part* | base64 -d > /tmp/fantasy-rpg.tar.gz
+          rm -rf /tmp/fantasy-rpg
+          mkdir -p /tmp/fantasy-rpg
+          tar -xzf /tmp/fantasy-rpg.tar.gz -C /tmp/fantasy-rpg
+
+      - name: Build vertical-slice branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C vertical-slice
+          git rm -rf .
+          cp -a /tmp/fantasy-rpg/. .
+          npm install --package-lock-only --ignore-scripts
+          mkdir -p .github/workflows
+          cat > .github/workflows/ci.yml <<'YAML'
+          name: CI
+
+          on:
+            pull_request:
+            push:
+              branches:
+                - vertical-slice
+
+          permissions:
+            contents: read
+
+          jobs:
+            verify:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: 22
+                    cache: npm
+                - name: Install dependencies
+                  run: npm ci
+                - name: Install Playwright Chromium
+                  run: npx playwright install --with-deps chromium
+                - name: Typecheck
+                  run: npm run typecheck
+                - name: Unit tests
+                  run: npm test
+                - name: Production build
+                  run: npm run build
+                - name: End-to-end tests
+                  run: npm run test:e2e
+          YAML
+          git add -A
+          git commit -m "feat: complete fantasy action RPG vertical slice"
+          git push -u origin vertical-slice
+
+      - name: Remove bootstrap files from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch main
+          git pull --ff-only origin main
+          git rm -r .bootstrap .github/workflows/bootstrap-vertical-slice.yml
+          git commit -m "chore: remove repository bootstrap"
+          git push origin main
