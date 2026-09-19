@@ -105,7 +105,6 @@ export class HideoutScene extends Phaser.Scene {
           hp: Math.max(1, Math.round(baseHp * tuning.enemyHpMultiplier)),
           position: { x, y },
           combat: this.combat,
-          damageMultiplier: tuning.enemyDamageMultiplier,
         });
         const image = this.add.image(x, y, 'bandit-placeholder').setTint(0x6e4334);
         this.enemies.push({ runtime, image, definition });
