@@ -19,11 +19,12 @@ export class BossScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#180f12');
     this.add.text(32, 24, 'Bandit Leader', { color: '#e5b0a7', fontSize: '28px' });
     this.add.text(32, 62, 'Fast rogue mirror: smoke • poison • feints • dodges', { color: '#9f7773' });
-    this.boss = this.add.image(640, 330, 'bandit-placeholder').setScale(2).setTint(0xc24d4d).setInteractive();
+    const boss = this.add.image(640, 330, 'bandit-placeholder').setScale(2).setTint(0xc24d4d).setInteractive();
+    this.boss = boss;
     this.hpText = this.add.text(540, 420, '', { color: '#f0c9c0', fontSize: '18px' });
     this.refreshHpLabel();
     this.add.text(32, 670, 'Click the leader to attack · E returns after victory', { color: '#c98e86' });
-    this.boss.on('pointerdown', () => this.hitBoss());
+    boss.on('pointerdown', () => this.hitBoss());
     this.input.keyboard?.on('keydown-E', () => { if (this.defeated) this.scene.start('OutpostScene'); });
   }
 
