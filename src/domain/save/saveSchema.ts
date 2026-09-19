@@ -62,10 +62,8 @@ export function migrateSave(envelope: SaveEnvelope<unknown>): SaveEnvelope<GameS
 }
 
 function normalizeContent(content: SaveContentInput): SaveContentIndex {
-  if (content instanceof Set) {
-    return { itemIds: content, skillNodes: new Map() };
-  }
-  return content;
+  if ('itemIds' in content) return content;
+  return { itemIds: content, skillNodes: new Map() };
 }
 
 export function sanitizeGameState(state: GameState, input: SaveContentInput): GameState {
