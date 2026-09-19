@@ -4,7 +4,7 @@ import { grantXp } from '../domain/progression/leveling.js';
 import { advanceQuest, turnInQuest, type BanditQuestStatus, type QuestState } from '../domain/quests/questState.js';
 import { LocalSaveRepository, type StorageLike } from '../domain/save/saveRepository.js';
 import { createInitialGameState, type GameState, type ScreenId, type SerializableItemStack } from '../domain/state/GameState.js';
-import { respecSkills, unlockSkill } from '../domain/skills/skillTree.js';
+import { assignActiveSkill, respecSkills, unlockSkill } from '../domain/skills/skillTree.js';
 import { rogueSkillNodes } from '../content/skills.js';
 import { questDefinitions } from '../content/quests.js';
 import { gameBridge, GameBridge } from './bridge/GameBridge.js';
@@ -254,6 +254,21 @@ export class GameSession {
     this.publish();
   }
 
+  private assignActive(activeSkillId: string, slotIndex: number): void {
+    const next = cloneState(this.state);
+    const result = assignActiveSkill(
+      rogueSkillNodes,
+      { learned: next.skills.learned },
+      next.skills.equippedActiveSkillIds,
+      activeSkillId,
+      slotIndex,
+    );
+    if (!result.assigned) return;
+    next.skills.equippedActiveSkillIds = result.slots;
+    this.state = next;
+    this.publish();
+  }
+
   private respec(): void {
     const next = cloneState(this.state);
     const result = respecSkills({ learned: next.skills.learned }, next.economy.gold, next.progression.level);
@@ -297,6 +312,7 @@ export class GameSession {
       case 'USE_POTION': this.usePotion(command.kind); break;
       case 'SAVE_GAME': this.save(); break;
       case 'UNLOCK_SKILL': this.unlock(command.skillId); break;
+      case 'ASSIGN_ACTIVE_SKILL': this.assignActive(command.activeSkillId, command.slotIndex); break;
       case 'RESPEC_SKILLS': this.respec(); break;
       case 'ACCEPT_QUEST': this.acceptQuest(command.questId); break;
       case 'TURN_IN_QUEST': this.turnIn(command.questId); break;

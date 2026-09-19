@@ -66,3 +66,32 @@ export function respecSkills(
   if (gold < cost) return { success: false, state, gold, refundedPoints: 0, cost };
   return { success: true, state: { learned: {} }, gold: gold - cost, refundedPoints, cost };
 }
+
+
+export interface ActiveSkillAssignmentResult {
+  assigned: boolean;
+  slots: Array<string | null>;
+}
+
+export function assignActiveSkill(
+  definitions: readonly SkillNodeDefinition[],
+  state: SkillTreeState,
+  currentSlots: readonly (string | null)[],
+  activeSkillId: string,
+  slotIndex: number,
+): ActiveSkillAssignmentResult {
+  const slots = [...currentSlots].slice(0, 4);
+  while (slots.length < 4) slots.push(null);
+
+  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= 4) {
+    return { assigned: false, slots };
+  }
+  const node = definitions.find((definition) =>
+    definition.kind === 'active' && definition.activeSkillId === activeSkillId,
+  );
+  if (!node || (state.learned[node.id] ?? 0) <= 0) return { assigned: false, slots };
+  if (slots.includes(activeSkillId)) return { assigned: false, slots };
+
+  slots[slotIndex] = activeSkillId;
+  return { assigned: true, slots };
+}
