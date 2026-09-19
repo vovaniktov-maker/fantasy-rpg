@@ -13,6 +13,7 @@ import { PlayerRuntime } from '../runtime/PlayerRuntime.js';
 import { getRuntimeTuning } from '../runtime/RuntimeTuning.js';
 import { SceneRuntimeHost } from '../runtime/SceneRuntimeHost.js';
 import { runtimeDiagnostics } from '../runtime/RuntimeDiagnostics.js';
+import { createRuntimeRandom, deriveRuntimeSeed } from '../runtime/RuntimeRandom.js';
 
 const CONTENT = buildContentRegistry();
 
@@ -24,15 +25,6 @@ function learnedActiveIds(learned: Record<string, number>): Set<string> {
     if (node?.kind === 'active' && node.activeSkillId) result.add(node.activeSkillId);
   }
   return result;
-}
-
-function seededRandom(seed: number) {
-  let state = seed >>> 0 || 1;
-  const next = () => {
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-  return { next, pick: <T>(items: readonly T[]) => items[Math.min(items.length - 1, Math.floor(next() * items.length))] };
 }
 
 export class BossScene extends Phaser.Scene {
@@ -50,7 +42,8 @@ export class BossScene extends Phaser.Scene {
   private readonly actionBuffer = new GameplayActionBuffer();
   private syncElapsed = 0;
   private victoryResolved = false;
-  private rng = seededRandom(1);
+  private combatRng = createRuntimeRandom(1);
+  private lootRng = createRuntimeRandom(2);
 
   constructor() { super('BossScene'); }
 
@@ -63,13 +56,15 @@ export class BossScene extends Phaser.Scene {
     const session = getDefaultGameSession();
     const state = session.enterBoss();
     const tuning = getRuntimeTuning();
-    this.rng = seededRandom(tuning.rngSeed ^ state.runSeed ^ 0xb055);
+    const runtimeSeed = tuning.rngSeed ^ state.runSeed ^ 0xb055;
+    this.combatRng = createRuntimeRandom(deriveRuntimeSeed(runtimeSeed, 'combat:boss'));
+    this.lootRng = createRuntimeRandom(deriveRuntimeSeed(runtimeSeed, 'loot:boss'));
     runtimeDiagnostics.setEnemies([]);
     this.cameras.main.setBackgroundColor('#180f12');
     this.add.text(32, 24, 'Bandit Leader', { color: '#e5b0a7', fontSize: '28px' });
     this.add.text(32, 62, 'Read the telegraphs · dodge · punish recovery · E collects loot / exits after victory', { color: '#9f7773' });
 
-    this.combat = new CombatRuntime(() => this.rng.next());
+    this.combat = new CombatRuntime(() => this.combatRng.next());
     const stats = deriveCombatStats(state, CONTENT);
     this.playerRuntime = new PlayerRuntime({
       id: 'player',
@@ -175,11 +170,11 @@ export class BossScene extends Phaser.Scene {
       session.markBanditLeaderDefeated();
       this.bossSprite.setAlpha(0.35).setTint(0x6c6c6c);
       const table = CONTENT.lootTables.get('bandit_leader');
-      const definitionId = table ? rollLoot(table.entries, session.getState().progression.level, this.rng) : null;
+      const definitionId = table ? rollLoot(table.entries, session.getState().progression.level, this.lootRng) : null;
       if (definitionId) {
         const definition = CONTENT.items.get(definitionId);
         const item: SerializableItemStack = {
-          instanceId: `boss-${definitionId}-${statefulId(this.rng.next())}`,
+          instanceId: `boss-${definitionId}-${statefulId(this.lootRng.next())}`,
           definitionId,
           quantity: 1,
           itemLevel: session.getState().progression.level,
