@@ -47,12 +47,12 @@ async function clickGame(page: Page, gameX: number, gameY: number): Promise<void
   );
 }
 
-async function attackNear(page: Page, x: number, y: number, attacks = 3): Promise<void> {
+async function attackNear(page: Page, x: number, y: number, attacks = 1): Promise<void> {
   await moveTo(page, x, y);
   await page.keyboard.press('Space');
   for (let index = 0; index < attacks; index += 1) {
     await clickGame(page, x, y);
-    await page.waitForTimeout(360);
+    await page.waitForTimeout(220);
   }
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(120);
@@ -92,7 +92,7 @@ async function clearRuntimeEnemies(page: Page, maxEngagements = 24): Promise<voi
       Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y)
     );
     const target = enemies[0];
-    await attackNear(page, target.x, target.y, 2);
+    await attackNear(page, target.x, target.y, 1);
   }
   expect(await runtimeEnemies(page)).toHaveLength(0);
 }
@@ -124,7 +124,7 @@ async function defeatRuntimeBoss(page: Page, maxEngagements = 20): Promise<{ x: 
 
     await page.keyboard.press('Space');
     await clickGame(page, movedBoss.x, movedBoss.y);
-    await page.waitForTimeout(360);
+    await page.waitForTimeout(220);
   }
 
   await expect(page.getByTestId('runtime-quest-status')).toHaveText('leaderDefeated');
