@@ -1,5 +1,10 @@
 import Phaser from 'phaser';
 
+interface CombatVisualScene {
+  add: Phaser.GameObjects.GameObjectFactory;
+  tweens: Phaser.Tweens.TweenManager;
+}
+
 export function drawAttackTelegraph(
   graphics: Phaser.GameObjects.Graphics,
   x: number,
@@ -31,7 +36,7 @@ export function clearTelegraph(graphics: Phaser.GameObjects.Graphics): void {
   graphics.clear();
 }
 
-export function playSlash(scene: Phaser.Scene, x: number, y: number, rotation: number): void {
+export function playSlash(scene: CombatVisualScene, x: number, y: number, rotation: number): void {
   const slash = scene.add.image(x, y, 'fx-slash')
     .setRotation(rotation)
     .setAlpha(0.95)
@@ -46,7 +51,7 @@ export function playSlash(scene: Phaser.Scene, x: number, y: number, rotation: n
   });
 }
 
-export function playDodgeSmoke(scene: Phaser.Scene, x: number, y: number): void {
+export function playDodgeSmoke(scene: CombatVisualScene, x: number, y: number): void {
   const smoke = scene.add.image(x, y, 'fx-smoke')
     .setAlpha(0.6)
     .setDepth(999);
