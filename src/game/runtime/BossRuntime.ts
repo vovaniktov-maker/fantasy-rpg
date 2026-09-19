@@ -16,6 +16,7 @@ export interface BossRuntimeConfig {
   maxHp?: number;
   armor?: number;
   timingMultiplier?: number;
+  damageMultiplier?: number;
 }
 
 export interface BossRuntimeObservation {
@@ -113,7 +114,7 @@ export class BossRuntime {
       const attackWindowId = move.damage > 0
         ? this.config.combat.beginAttack({
             ownerId: this.id,
-            rawDamage: move.damage,
+            rawDamage: move.damage * Math.max(0, this.config.damageMultiplier ?? 1),
             critChance: 0,
             critDamage: 1,
           })
