@@ -37,8 +37,7 @@ export class BossScene extends Phaser.Scene {
   private bossSprite?: Phaser.GameObjects.Image;
   private hpText?: Phaser.GameObjects.Text;
   private readonly lootSprites = new Map<string, Phaser.GameObjects.Image>();
-  private keys: Partial<Record<'W'|'A'|'S'|'D'|'SPACE'|'E', Phaser.Input.Keyboard.Key>> = {};
-  private skillKeys: Phaser.Input.Keyboard.Key[] = [];
+  private keys: Partial<Record<'W'|'A'|'S'|'D', Phaser.Input.Keyboard.Key>> = {};
   private readonly actionBuffer = new GameplayActionBuffer();
   private syncElapsed = 0;
   private victoryResolved = false;
@@ -102,13 +101,19 @@ export class BossScene extends Phaser.Scene {
       A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
       S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
       D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-      SPACE: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
-      E: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E),
     };
-    this.skillKeys = [Phaser.Input.Keyboard.KeyCodes.ONE, Phaser.Input.Keyboard.KeyCodes.TWO, Phaser.Input.Keyboard.KeyCodes.THREE, Phaser.Input.Keyboard.KeyCodes.FOUR]
-      .map((code) => keyboard.addKey(code));
 
     this.host = new SceneRuntimeHost(gameplayControlState);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'KeyE') this.actionBuffer.queueInteract();
+      if (event.code === 'Space') this.actionBuffer.queueDodge();
+      if (event.code.startsWith('Digit')) {
+        const slotIndex = Number(event.code.slice(5)) - 1;
+        this.actionBuffer.queueSkillSlot(slotIndex);
+      }
+    };
+    this.input.keyboard?.on('keydown', onKeyDown);
+    this.host.own(() => this.input.keyboard?.off('keydown', onKeyDown));
     const onPointerDown = (pointer: Phaser.Input.Pointer) => {
       if (pointer.leftButtonDown()) this.actionBuffer.queueBasicAttack();
     };
@@ -125,15 +130,15 @@ export class BossScene extends Phaser.Scene {
     this.playerRuntime.setControls(controls);
     if (!controls.inputEnabled) this.actionBuffer.clear();
     const pointer = this.input.activePointer;
-    const skillIndex = this.skillKeys.findIndex((key) => Phaser.Input.Keyboard.JustDown(key));
+    const skillIndex = controls.inputEnabled ? this.actionBuffer.consumeSkillSlot() : null;
     const playerFrame = this.playerRuntime.update({
       moveX: Number(this.keys.D?.isDown) - Number(this.keys.A?.isDown),
       moveY: Number(this.keys.S?.isDown) - Number(this.keys.W?.isDown),
       aimX: pointer.worldX,
       aimY: pointer.worldY,
       basicAttackPressed: controls.inputEnabled ? this.actionBuffer.consumeBasicAttack() : false,
-      dodgePressed: controls.inputEnabled && !!this.keys.SPACE && Phaser.Input.Keyboard.JustDown(this.keys.SPACE),
-      skillSlotPressed: controls.inputEnabled && skillIndex >= 0 ? skillIndex : null,
+      dodgePressed: controls.inputEnabled ? this.actionBuffer.consumeDodge() : false,
+      skillSlotPressed: controls.inputEnabled && skillIndex !== null ? skillIndex : null,
     }, dtMs);
 
     const player = this.playerRuntime.snapshot;
@@ -186,7 +191,7 @@ export class BossScene extends Phaser.Scene {
       this.add.text(500, 500, 'Leader defeated — collect the drop, then press E to return', { color: '#e8d8b0', fontSize: '18px' });
     }
 
-    if (controls.inputEnabled && this.keys.E && Phaser.Input.Keyboard.JustDown(this.keys.E)) {
+    if (controls.inputEnabled && this.actionBuffer.consumeInteract()) {
       const interaction = this.lootRuntime.tryInteract(player.position);
       if (interaction.collected && interaction.pickup) {
         this.lootSprites.get(interaction.pickup.id)?.destroy();
