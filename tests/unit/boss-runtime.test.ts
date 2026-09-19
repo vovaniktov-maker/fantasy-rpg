@@ -42,3 +42,28 @@ describe('BossRuntime', () => {
     expect(boss.consumeVictory().resolved).toBe(false);
   });
 });
+
+
+  it('scales outgoing damage without changing authored phase stats', () => {
+    const combat = new CombatRuntime(() => 0.5);
+    const boss = new BossRuntime({ combat, damageMultiplier: 0.1 });
+    const initial = boss.snapshot;
+    let targetHp = 100;
+    const target = {
+      id: 'player',
+      getHp: () => targetHp,
+      getArmor: () => 0,
+      isInvulnerable: () => false,
+      applyDamage: (amount: number) => { targetHp -= amount; },
+    };
+
+    boss.update({ distance: 60 }, 1);
+    boss.update({ distance: 60 }, 260);
+    const active = boss.update({ distance: 60 }, 1);
+    expect(active.attackWindowId).toBeDefined();
+    combat.tryHit(active.attackWindowId!, target);
+
+    expect(targetHp).toBe(98);
+    expect(boss.snapshot.maxHp).toBe(initial.maxHp);
+    expect(boss.snapshot.armor).toBe(initial.armor);
+  });
