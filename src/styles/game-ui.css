@@ -30,3 +30,89 @@
 .test-flow { pointer-events: auto; position: absolute; left: 18px; bottom: 18px; max-width: 760px; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: rgba(9, 9, 12, .9); border: 1px dashed #7b6da8; }
 .test-flow strong { width: 100%; color: #bfb3e7; }
 .test-flow button { background: #282337; color: #eee8ff; border: 1px solid #65598b; padding: 5px 8px; }
+
+
+/* Visual playability pass */
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(72, 58, 44, .22), transparent 42%),
+    #090b0d;
+  overflow: hidden;
+}
+#game-root canvas {
+  display: block;
+  width: min(100vw, 1280px);
+  height: auto;
+  margin: 0 auto;
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 1px rgba(171, 137, 93, .18), 0 24px 80px rgba(0,0,0,.65);
+}
+.hud {
+  width: 320px;
+  padding: 12px 14px 13px;
+  background: linear-gradient(180deg, rgba(15, 16, 19, .9), rgba(8, 9, 11, .82));
+  border: 1px solid rgba(183, 151, 103, .45);
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+.hud-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 7px;
+  letter-spacing: .12em;
+  color: #ead9b9;
+}
+.hud-title span {
+  color: #8f9b93;
+  font-size: 10px;
+  letter-spacing: .08em;
+}
+.hud-bar-track {
+  overflow: hidden;
+  height: 10px;
+  background: #15171a;
+  border-color: #3c4147;
+  border-radius: 4px;
+}
+.hud-bar-fill {
+  transition: width .12s linear;
+}
+.hud-bar-hp .hud-bar-fill {
+  background: linear-gradient(90deg, #7a202a, #d45a57);
+  box-shadow: 0 0 10px rgba(212,90,87,.28);
+}
+.hud-bar-energy .hud-bar-fill {
+  background: linear-gradient(90deg, #244d75, #58a8d8);
+  box-shadow: 0 0 10px rgba(88,168,216,.24);
+}
+.ui-nav button,
+.inventory-toggle {
+  border-radius: 6px;
+  background: rgba(20, 18, 16, .88);
+  border-color: rgba(154, 123, 80, .72);
+  transition: background .12s ease, transform .12s ease;
+}
+.ui-nav button:hover,
+.inventory-toggle:hover {
+  background: rgba(54, 42, 30, .94);
+  transform: translateY(-1px);
+}
+.panel {
+  border-radius: 9px;
+  border-color: rgba(150, 119, 77, .62);
+  background: linear-gradient(180deg, rgba(18,18,21,.97), rgba(11,11,14,.96));
+}
+.inventory-slot {
+  border-radius: 5px;
+  transition: border-color .12s ease, background .12s ease;
+}
+.inventory-slot:hover {
+  border-color: #9c7952;
+  background: #2b241d;
+}
+.test-flow {
+  opacity: .72;
+  font-size: 11px;
+}

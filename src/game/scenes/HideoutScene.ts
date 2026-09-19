@@ -1,18 +1,283 @@
 import Phaser from 'phaser';
-import { dungeonRoomDefinitions } from '../../content/dungeonRooms';
-import { generateDungeon } from '../../domain/dungeon/dungeonGenerator';
-import { getDefaultGameSession } from '../GameSession';
+import { dungeonRoomDefinitions } from '../../content/dungeonRooms.js';
+import { type EnemyDefinition } from '../../content/enemies.js';
+import { buildContentRegistry } from '../../domain/content/contentRegistry.js';
+import { generateDungeon } from '../../domain/dungeon/dungeonGenerator.js';
+import { deriveCombatStats } from '../../domain/stats/DerivedStatsService.js';
+import { getDefaultGameSession } from '../GameSession.js';
+import { gameBridge } from '../bridge/GameBridge.js';
+import { GameplayActionBuffer } from '../input/GameplayActionBuffer.js';
+import { gameplayControlState, type GameplayControlSnapshot } from '../runtime/GameplayControlState.js';
+import { CombatRuntime } from '../runtime/CombatRuntime.js';
+import { EnemyRuntime } from '../runtime/EnemyRuntime.js';
+import { LootRuntime, createEnemyDrop } from '../runtime/LootRuntime.js';
+import { PlayerRuntime } from '../runtime/PlayerRuntime.js';
+import { getRuntimeTuning } from '../runtime/RuntimeTuning.js';
+import { SceneRuntimeHost } from '../runtime/SceneRuntimeHost.js';
+import { runtimeDiagnostics } from '../runtime/RuntimeDiagnostics.js';
+import { createRuntimeRandom, deriveRuntimeSeed } from '../runtime/RuntimeRandom.js';
+import { DungeonAssembler } from '../world/DungeonAssembler.js';
+import { DungeonEncounterGate } from '../world/DungeonEncounterGate.js';
+import { enemyTextureKey, getRarityColor, itemTextureKey } from '../visuals/VisualCatalog.js';
+import { buildHideoutEnvironment } from '../visuals/SceneEnvironment.js';
+import { clearTelegraph, drawAttackActive, drawAttackTelegraph, playDodgeSmoke, playSlash } from '../visuals/CombatVisuals.js';
+
+const CONTENT = buildContentRegistry();
+
+function learnedActiveIds(learned: Record<string, number>): Set<string> {
+  const result = new Set<string>();
+  for (const [nodeId, rank] of Object.entries(learned)) {
+    if (rank <= 0) continue;
+    const node = CONTENT.skills.get(nodeId);
+    if (node?.kind === 'active' && node.activeSkillId) result.add(node.activeSkillId);
+  }
+  return result;
+}
 
 export class HideoutScene extends Phaser.Scene {
+  private host?: SceneRuntimeHost;
+  private playerRuntime?: PlayerRuntime;
+  private playerSprite?: Phaser.GameObjects.Image;
+  private combat?: CombatRuntime;
+  private lootRuntime?: LootRuntime;
+  private readonly enemies: Array<{ runtime: EnemyRuntime; image: Phaser.GameObjects.Image; definition: EnemyDefinition; roomIndex: number; telegraph: Phaser.GameObjects.Graphics }> = [];
+  private readonly lootSprites = new Map<string, Phaser.GameObjects.Image>();
+  private keys: Partial<Record<'W'|'A'|'S'|'D', Phaser.Input.Keyboard.Key>> = {};
+  private readonly actionBuffer = new GameplayActionBuffer();
+  private syncElapsed = 0;
+  private cleared = false;
+  private encounterGate?: DungeonEncounterGate;
+  private combatRng = createRuntimeRandom(1);
+  private lootSeedBase = 1;
+
   constructor() { super('HideoutScene'); }
+
   create(data?: { seed?: number }): void {
+    this.enemies.length = 0;
+    this.lootSprites.clear();
+    this.cleared = false;
+    this.syncElapsed = 0;
+    this.actionBuffer.clear();
+    runtimeDiagnostics.setEnemies([]);
+    runtimeDiagnostics.setHideoutCleared(false);
+    const session = getDefaultGameSession();
+    const state = session.enterHideout();
+    const tuning = getRuntimeTuning();
+    const runtimeSeed = tuning.rngSeed ^ state.runSeed;
+    this.combatRng = createRuntimeRandom(deriveRuntimeSeed(runtimeSeed, 'combat:hideout'));
+    this.lootSeedBase = runtimeSeed;
+    const generated = generateDungeon(data?.seed ?? state.runSeed, dungeonRoomDefinitions);
+    if (!generated.ok) throw new Error(generated.error.message);
+    const rooms = new DungeonAssembler(dungeonRoomDefinitions).assemble(generated.dungeon);
+    this.encounterGate = new DungeonEncounterGate(rooms.map((room) => room.encounterIds.length));
+
     this.cameras.main.setBackgroundColor('#17120f');
-    const sessionState = getDefaultGameSession().enterHideout();
-    const result = generateDungeon(data?.seed ?? sessionState.runSeed, dungeonRoomDefinitions);
-    if (!result.ok) throw new Error(result.error.message);
+    buildHideoutEnvironment(this);
     this.add.text(32, 24, 'Bandit Hideout', { color: '#d5c0a0', fontSize: '24px' });
-    result.dungeon.rooms.forEach((room, index) => this.add.text(48, 80 + index * 26, `${index + 1}. ${room.definitionId}`, { color: '#9b8a74' }));
-    this.add.text(32, 670, `Run seed ${sessionState.runSeed} · E confront the leader`, { color: '#caa278' });
-    this.input.keyboard?.once('keydown-E', () => this.scene.start('BossScene'));
+    this.add.text(32, 58, `Run seed ${state.runSeed} · clear the route · E opens the boss door`, { color: '#9b8a74' });
+
+    this.combat = new CombatRuntime(() => this.combatRng.next());
+    const stats = deriveCombatStats(state, CONTENT);
+    this.playerRuntime = new PlayerRuntime({
+      id: 'player',
+      position: { x: 120, y: 360 },
+      hp: state.player.hp,
+      stats,
+      learnedSkills: learnedActiveIds(state.skills.learned),
+      equippedSkills: state.skills.equippedActiveSkillIds,
+      combat: this.combat,
+    });
+    this.playerSprite = this.add.image(120, 360, 'rogue').setScale(1.35).setDepth(360);
+
+    this.lootRuntime = new LootRuntime({
+      content: CONTENT,
+      getInventory: () => session.getState().inventory,
+      setInventory: (inventory) => {
+        const next = session.getState();
+        next.inventory = inventory;
+        session.replaceState(next);
+      },
+    });
+
+    let enemyIndex = 0;
+    for (const [roomIndex, room] of rooms.entries()) {
+      this.add.text(40 + roomIndex * 170, 105, room.definitionId, { color: '#6f6255', fontSize: '12px' });
+      let enemyInRoom = 0;
+      for (const enemyId of room.encounterIds) {
+        const definition = CONTENT.enemies.get(enemyId);
+        if (!definition) continue;
+        const x = 360 + (enemyInRoom % 3) * 240;
+        const y = 245 + (enemyInRoom % 2) * 230;
+        const baseHp = definition.archetype === 'heavy' ? 160 : 85;
+        const runtime = new EnemyRuntime({
+          id: `hideout-${enemyId}-${enemyIndex}`,
+          definition,
+          hp: Math.max(1, Math.round(baseHp * tuning.enemyHpMultiplier)),
+          position: { x, y },
+          combat: this.combat,
+        });
+        const image = this.add.image(x, y, enemyTextureKey(definition.id))
+          .setScale(definition.archetype === 'heavy' ? 1.18 : 1.08)
+          .setDepth(y)
+          .setVisible(this.encounterGate.isRoomActive(roomIndex));
+        const telegraph = this.add.graphics().setDepth(y - 1);
+        this.enemies.push({ runtime, image, definition, roomIndex, telegraph });
+        enemyIndex += 1;
+        enemyInRoom += 1;
+      }
+    }
+
+    const keyboard = this.input.keyboard!;
+    this.keys = {
+      W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+    };
+
+    this.host = new SceneRuntimeHost(gameplayControlState);
+    this.host.own(gameBridge.onEvent((event) => {
+      if (event.type === 'PLAYER_RESOURCES_SYNCED') {
+        this.playerRuntime?.syncResources({ hp: event.hp, energy: event.energy });
+      }
+    }));
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'KeyE') this.actionBuffer.queueInteract();
+      if (event.code === 'Space') this.actionBuffer.queueDodge();
+      if (event.code.startsWith('Digit')) {
+        const slotIndex = Number(event.code.slice(5)) - 1;
+        this.actionBuffer.queueSkillSlot(slotIndex);
+      }
+    };
+    this.input.keyboard?.on('keydown', onKeyDown);
+    this.host.own(() => this.input.keyboard?.off('keydown', onKeyDown));
+    const onPointerDown = (pointer: Phaser.Input.Pointer) => {
+      if (pointer.leftButtonDown()) this.actionBuffer.queueBasicAttack();
+    };
+    this.input.on('pointerdown', onPointerDown);
+    this.host.own(() => this.input.off('pointerdown', onPointerDown));
+    this.host.onFrame((dtMs, controls) => this.stepRuntime(dtMs, controls));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { runtimeDiagnostics.setEnemies([]); this.host?.dispose(); });
+  }
+
+  update(_time: number, delta: number): void { this.host?.tick(delta); }
+
+  private stepRuntime(dtMs: number, controls: Readonly<GameplayControlSnapshot>): void {
+    if (!this.playerRuntime || !this.playerSprite || !this.combat || !this.lootRuntime) return;
+    this.playerRuntime.setControls(controls);
+    if (!controls.inputEnabled) this.actionBuffer.clear();
+    const pointer = this.input.activePointer;
+    const skillIndex = controls.inputEnabled ? this.actionBuffer.consumeSkillSlot() : null;
+    const frame = this.playerRuntime.update({
+      moveX: Number(this.keys.D?.isDown) - Number(this.keys.A?.isDown),
+      moveY: Number(this.keys.S?.isDown) - Number(this.keys.W?.isDown),
+      aimX: pointer.worldX,
+      aimY: pointer.worldY,
+      basicAttackPressed: controls.inputEnabled ? this.actionBuffer.consumeBasicAttack() : false,
+      dodgePressed: controls.inputEnabled ? this.actionBuffer.consumeDodge() : false,
+      skillSlotPressed: controls.inputEnabled && skillIndex !== null ? skillIndex : null,
+    }, dtMs);
+    const player = this.playerRuntime.snapshot;
+    this.playerSprite.setPosition(player.position.x, player.position.y).setRotation(player.facingRadians).setDepth(player.position.y);
+    if (frame.attackStarted || frame.skillStarted) playSlash(this, player.position.x, player.position.y, player.facingRadians);
+    if (frame.dodgeStarted) playDodgeSmoke(this, player.position.x, player.position.y);
+
+    const attackIds = [frame.attackWindowId, frame.skillAttackWindowId].filter((id): id is string => !!id);
+    for (const entry of this.enemies) {
+      const current = entry.runtime.snapshot;
+      if (!current.alive || !this.encounterGate?.isRoomActive(entry.roomIndex)) continue;
+      const dx = player.position.x - current.x;
+      const dy = player.position.y - current.y;
+      const distance = Math.hypot(dx, dy);
+      const enemyFrame = entry.runtime.update({
+        playerVisible: distance <= Math.max(180, entry.definition.preferredRange * 1.2),
+        distance,
+        attackReady: true,
+        hpRatio: current.hp / Math.max(1, current.maxHp),
+        directionToPlayer: { x: dx, y: dy },
+      }, dtMs);
+      const next = entry.runtime.snapshot;
+      entry.image.setPosition(next.x, next.y).setDepth(next.y);
+      entry.telegraph.setDepth(next.y - 1);
+      const attackRadius = Math.min(110, Math.max(...entry.definition.attacks.map((attack) => attack.range)));
+      if (enemyFrame.telegraph) {
+        drawAttackTelegraph(entry.telegraph, next.x, next.y, attackRadius);
+        entry.image.setTint(0xffd27a);
+      } else if (enemyFrame.attackWindowId) {
+        drawAttackActive(entry.telegraph, next.x, next.y, attackRadius);
+        entry.image.setTint(0xff7777);
+      } else {
+        clearTelegraph(entry.telegraph);
+        entry.image.clearTint();
+      }
+      if (enemyFrame.attackWindowId) {
+        const maxRange = Math.max(...entry.definition.attacks.map((attack) => attack.range));
+        if (distance <= maxRange) this.combat.tryHit(enemyFrame.attackWindowId, this.playerRuntime.getCombatTarget());
+      }
+      for (const id of attackIds) if (distance <= 105) this.combat.tryHit(id, entry.runtime.getCombatTarget());
+
+      if (entry.runtime.consumeDeathEvent()) {
+        clearTelegraph(entry.telegraph);
+        entry.image.setVisible(false);
+        this.encounterGate?.recordEnemyDeath(entry.roomIndex);
+        const activeRoomIndex = this.encounterGate?.activeRoomIndex ?? null;
+        for (const candidate of this.enemies) {
+          if (candidate.runtime.isDead()) continue;
+          candidate.image.setVisible(activeRoomIndex === candidate.roomIndex);
+          if (activeRoomIndex !== candidate.roomIndex) clearTelegraph(candidate.telegraph);
+        }
+        const lootRng = createRuntimeRandom(deriveRuntimeSeed(this.lootSeedBase, `loot:${entry.runtime.snapshot.id}`));
+        const drop = createEnemyDrop(entry.definition.id, getDefaultGameSession().getState().progression.level, lootRng, CONTENT);
+        if (drop) {
+          const pickup = this.lootRuntime.spawnDrop({ item: drop, position: { x: next.x, y: next.y } });
+          const definition = CONTENT.items.get(drop.definitionId);
+          const key = definition ? itemTextureKey(definition) : 'item-generic';
+          const lootImage = this.add.image(next.x, next.y, key)
+            .setScale(1.05)
+            .setTint(getRarityColor(drop.rarity))
+            .setDepth(next.y + 2);
+          this.tweens.add({ targets: lootImage, y: next.y - 6, duration: 550, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+          this.lootSprites.set(pickup.id, lootImage);
+        }
+      }
+    }
+
+    runtimeDiagnostics.setEnemies(this.enemies
+      .filter((entry) => this.encounterGate?.isRoomActive(entry.roomIndex))
+      .map((entry) => entry.runtime.snapshot)
+      .filter((enemy) => enemy.alive)
+      .map((enemy) => ({ id: enemy.id, x: Math.round(enemy.x), y: Math.round(enemy.y), hp: enemy.hp })));
+
+    if (!this.cleared && this.encounterGate?.cleared) {
+      this.cleared = true;
+      runtimeDiagnostics.setHideoutCleared(true);
+      this.add.text(470, 100, 'Hideout route cleared — press E for the leader', { color: '#e0c99d' });
+    }
+
+    if (controls.inputEnabled && this.actionBuffer.consumeInteract()) {
+      const interaction = this.lootRuntime.tryInteract(player.position);
+      if (interaction.collected && interaction.pickup) {
+        this.lootSprites.get(interaction.pickup.id)?.destroy();
+        this.lootSprites.delete(interaction.pickup.id);
+      } else if (this.cleared) {
+        this.scene.start('BossScene');
+        return;
+      }
+    }
+
+    this.syncElapsed += dtMs;
+    if (this.syncElapsed >= 100) {
+      this.syncElapsed = 0;
+      const session = getDefaultGameSession();
+      const next = session.getState();
+      next.player.hp = player.hp;
+      next.player.energy = player.energy;
+      next.player.position = { ...player.position };
+      session.replaceState(next);
+      if (player.hp <= 0) {
+        session.onDeath();
+        this.scene.start('OutpostScene');
+      }
+    }
   }
 }

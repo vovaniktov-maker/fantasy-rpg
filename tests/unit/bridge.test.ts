@@ -13,6 +13,19 @@ describe('GameBridge', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it('delivers typed runtime events and disposes event listeners', () => {
+    const bridge = new GameBridge();
+    const listener = vi.fn();
+    const off = bridge.onEvent(listener);
+
+    bridge.emit({ type: 'PLAYER_RESOURCES_SYNCED', hp: 80, energy: 55 });
+    expect(listener).toHaveBeenCalledWith({ type: 'PLAYER_RESOURCES_SYNCED', hp: 80, energy: 55 });
+
+    off();
+    bridge.emit({ type: 'PLAYER_RESOURCES_SYNCED', hp: 90, energy: 60 });
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps remaining listeners active without duplicates', () => {
     const bridge = new GameBridge();
     const disposed = vi.fn();

@@ -1,21 +1,29 @@
-import { gameBridge } from '../../game/bridge/GameBridge';
-import { getDefaultGameSession } from '../../game/GameSession';
+import { useSyncExternalStore } from 'react';
+import { runtimeDiagnostics } from '../../game/runtime/RuntimeDiagnostics';
 import { useGameSnapshot } from '../useGameSnapshot';
 
 export function TestFlowPanel() {
   const state = useGameSnapshot();
-  const session = getDefaultGameSession();
+  const diagnostics = useSyncExternalStore(
+    (listener) => runtimeDiagnostics.subscribe(listener),
+    () => runtimeDiagnostics.getSnapshot(),
+    () => runtimeDiagnostics.getSnapshot(),
+  );
+  const equippedCount = Object.values(state.equipment).filter(Boolean).length;
+  const inventoryCount = state.inventory.slots.filter(Boolean).length;
+  const questStatus = state.quests.bandit_leader_contract ?? 'available';
   return (
-    <section className="test-flow" aria-label="Deterministic test controls">
-      <strong>Test mode · {state.screen}</strong>
-      <button onClick={() => session.enterForest()}>Enter forest</button>
-      <button onClick={() => session.completeForestEncounter()}>Defeat encounter</button>
-      <button onClick={() => session.grantLoot('steel_dagger')}>Pick up test loot</button>
-      <button onClick={() => session.enterHideout()}>Enter hideout</button>
-      <button onClick={() => session.enterBoss()}>Reach boss</button>
-      <button onClick={() => session.markBanditLeaderDefeated()}>Defeat boss</button>
-      <button onClick={() => session.enterOutpost()}>Return to outpost</button>
-      <button onClick={() => gameBridge.dispatch({ type: 'SAVE_GAME' })}>Save game</button>
+    <section className="test-flow" aria-label="Runtime test diagnostics">
+      <strong>Test mode diagnostics</strong>
+      <span>screen: <output data-testid="runtime-screen">{state.screen}</output></span>
+      <span>player: <output data-testid="runtime-player-position">{Math.round(state.player.position.x)},{Math.round(state.player.position.y)}</output></span>
+      <span>hp: <output data-testid="runtime-player-hp">{Math.round(state.player.hp)}</output></span>
+      <span>quest: <output data-testid="runtime-quest-status">{questStatus}</output></span>
+      <span>forest clear: <output data-testid="runtime-forest-cleared">{String(state.world.forestEncounterDefeated)}</output></span>
+      <span>hideout clear: <output data-testid="runtime-hideout-cleared">{String(diagnostics.hideoutCleared)}</output></span>
+      <span>inventory: <output data-testid="runtime-inventory-count">{inventoryCount}</output></span>
+      <span>equipped: <output data-testid="runtime-equipped-count">{equippedCount}</output></span>
+      <output data-testid="runtime-enemies">{JSON.stringify(diagnostics.enemies)}</output>
     </section>
   );
 }

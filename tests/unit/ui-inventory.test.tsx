@@ -26,3 +26,35 @@ describe('RPG UI', () => {
     off();
   });
 });
+
+
+it('dispatches the declared equipment slot instead of hardcoding weapon', () => {
+  const state = gameBridge.getSnapshot();
+  const slots = [...state.inventory.slots];
+  slots[0] = { instanceId: 'cowl-1', definitionId: 'shadow_cowl', quantity: 1, itemLevel: 2, rarity: 'rare' };
+  gameBridge.publish({ inventory: { capacity: state.inventory.capacity, slots } });
+  const spy = vi.fn();
+  const off = gameBridge.onCommand(spy);
+  render(<InventoryPanel open onClose={() => {}} />);
+  fireEvent.click(screen.getByText('shadow_cowl'));
+  fireEvent.click(screen.getByText('Equip'));
+  expect(spy).toHaveBeenCalledWith({ type: 'EQUIP_ITEM', itemId: 'cowl-1', slot: 'head' });
+  off();
+});
+
+
+it('dispatches health potion use from the inventory', () => {
+  const state = gameBridge.getSnapshot();
+  const slots = [...state.inventory.slots];
+  slots[0] = { instanceId: 'hp-start', definitionId: 'health_potion', quantity: 1, itemLevel: 1, rarity: 'common' };
+  gameBridge.publish({ inventory: { capacity: state.inventory.capacity, slots } });
+  const spy = vi.fn();
+  const off = gameBridge.onCommand(spy);
+
+  render(<InventoryPanel open onClose={() => {}} />);
+  fireEvent.click(screen.getByText('health_potion'));
+  fireEvent.click(screen.getByRole('button', { name: 'Use health potion' }));
+
+  expect(spy).toHaveBeenCalledWith({ type: 'USE_POTION', kind: 'health' });
+  off();
+});

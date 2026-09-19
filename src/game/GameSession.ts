@@ -135,6 +135,11 @@ export class GameSession {
     this.state = next;
     this.potionCooldownUntilMs = now + this.potionCooldownMs;
     this.publish();
+    this.bridge.emit({
+      type: 'PLAYER_RESOURCES_SYNCED',
+      hp: next.player.hp,
+      energy: next.player.energy,
+    });
     return true;
   }
 

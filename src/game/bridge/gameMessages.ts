@@ -10,6 +10,7 @@ export type GameCommand =
   | { type: 'SAVE_GAME' };
 
 export type GameEvent =
+  | { type: 'PLAYER_RESOURCES_SYNCED'; hp: number; energy: number }
   | { type: 'PLAYER_DAMAGED'; amount: number }
   | { type: 'LOOT_PICKED_UP'; itemId: string }
   | { type: 'QUEST_UPDATED'; questId: string }

@@ -54,6 +54,22 @@ describe('PlayerRuntime', () => {
     expect(frame.attackStarted).toBe(false);
   });
 
+  it('syncs externally restored resources without clearing active dodge state', () => {
+    const runtime = makeRuntime();
+    const dodge = runtime.update(makeInput({ moveX: 1, dodgePressed: true }), 16);
+    expect(dodge.dodgeStarted).toBe(true);
+    expect(runtime.snapshot.energy).toBe(70);
+
+    runtime.getCombatTarget().applyDamage(70);
+    expect(runtime.snapshot.hp).toBe(30);
+
+    runtime.syncResources({ hp: 80, energy: 95 });
+
+    expect(runtime.snapshot.hp).toBe(80);
+    expect(runtime.snapshot.energy).toBe(95);
+    expect(runtime.snapshot.invulnerable).toBe(true);
+  });
+
   it('starts an assigned learned active skill and pays its energy cost', () => {
     const runtime = makeRuntime({ learned: ['shadow_dash'], equipped: ['shadow_dash', null, null, null] });
     const frame = runtime.update(makeInput({ skillSlotPressed: 0 }), 16);
