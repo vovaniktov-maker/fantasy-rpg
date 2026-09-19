@@ -35,7 +35,13 @@ export function createInitialGameState(): GameState {
     screen: 'outpost',
     player: { hp: 100, maxHp: 100, energy: 100, maxEnergy: 100, position: { x: 0, y: 0 } },
     progression: { level: 1, xp: 0, unspentSkillPoints: 0 },
-    inventory: { capacity: 20, slots: Array.from({ length: 20 }, () => null) },
+    inventory: {
+      capacity: 20,
+      slots: [
+        { instanceId: 'starter-health-potion', definitionId: 'health_potion', quantity: 1, itemLevel: 1, rarity: 'common' },
+        ...Array.from({ length: 19 }, () => null),
+      ],
+    },
     equipment: {},
     skills: { learned: {}, equippedActiveSkillIds: [null, null, null, null] },
     economy: { gold: 0 },
