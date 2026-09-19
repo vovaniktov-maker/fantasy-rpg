@@ -104,7 +104,7 @@ export class ForestScene extends Phaser.Scene {
       { x: 930, y: 520 },
     ];
     enemyDefinitions.forEach((definition, index) => {
-      const hp = Math.max(10, Math.round(hpFor(definition) * tuning.enemyHpMultiplier));
+      const hp = Math.max(1, Math.round(hpFor(definition) * tuning.enemyHpMultiplier));
       const runtime = new EnemyRuntime({
         id: `forest-${definition.id}-${index}`,
         definition,
